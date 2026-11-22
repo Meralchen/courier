@@ -25,8 +25,10 @@ and attaches them to the
 - `SHA256SUMS.txt` — checksums for all four. A rebuild replaces the APKs and the
   sums together, so read this file rather than a checksum copied into a document.
 
-Measured on the published files (run #15, commit `d27c02a`): **arm64 41.6 MB**,
-arm 32.9 MB, universal 98.4 MB, debug 228.8 MB. The first universal build was
+Measured on the published files (run #17, commit `1ad7c32`): **arm64
+41,651,792 B (41.7 MB)**, arm 32,967,178 B, universal 98,501,359 B, debug
+~228.9 MB. Downloaded the published arm64 APK and matched its SHA-256
+(`61d006a1…caa142`) against `SHA256SUMS.txt`. The first universal build was
 120 MB because it packed three TDLib binaries (`arm64-v8a`, `armeabi-v7a`,
 `x86_64`) and unshrunk dex. R8 cut `classes.dex` from 9.7 MB to 2.8 MB, and the
 per-ABI splits leave exactly one `libtdjni.so` in each stable APK. Downloaded
@@ -43,6 +45,32 @@ is present.
   `org.drinkless.tdlib.**`, every class declaring native methods and the
   `com.courier.messenger.telegram.**` bridge, so TDLib's JNI surface survives
   shrinking.
+
+## Performance and material pass (2026-11-22)
+
+The first glass build stuttered. Three costs were removed rather than traded
+against quality:
+
+- **Static backdrop.** `LiquidWallpaper` stepped a full-screen gradient at
+  ~15 Hz, so every glass panel above it re-ran its backdrop filter at that rate.
+  The field is now painted once per size and theme.
+- **Material only where iOS has it.** Settings groups, search fields, nav-bar
+  icons, empty states and the calls screen are opaque (`SettingsGroup`,
+  `IosSearchField`, `NavIconButton`). The chats screen dropped from roughly six
+  backdrop filters to two (header, tab bar); Settings went to zero.
+- **Fewer rebuilds.** TDLib notifications are coalesced per microtask, file
+  progress reports every 5 %, `StoreSelector` narrows list rebuilds, and the
+  chat screen caches rows until the message list, media version, typing state or
+  theme changes. The pinned chats header no longer changes its shader tint with
+  the scroll offset.
+
+Overlay fixes: the jump-to-latest button now lives inside the transcript (it used
+to sit over the composer once a reply preview expanded it), and action sheets add
+the home-indicator inset to their bottom padding.
+
+Not verified: frame timings on a device. This environment has no emulator
+(`/dev/kvm` denied) and no Telegram account, so the improvement is argued from
+removed per-frame work, not measured fps.
 
 ## Phase 1 — Flutter rewrite
 

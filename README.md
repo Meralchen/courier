@@ -20,10 +20,11 @@ Two APKs are built by GitHub Actions and attached to the
 | --- | --- | --- |
 | Stable, arm64 | [`Courier-1.0-arm64.apk`](https://github.com/Meralchen/courier/releases/download/courier-latest/Courier-1.0-arm64.apk) | 41.6 MB — 64-bit ARM, R8-shrunk with a single TDLib binary. **Start here.** |
 | Stable, arm 32-bit | [`Courier-1.0-arm.apk`](https://github.com/Meralchen/courier/releases/download/courier-latest/Courier-1.0-arm.apk) | 32.9 MB — for older or low-end phones |
-| Stable, universal | [`Courier-1.0-universal.apk`](https://github.com/Meralchen/courier/releases/download/courier-latest/Courier-1.0-universal.apk) | 98.4 MB — both ARM ABIs in one file |
+| Stable, universal | [`Courier-1.0-universal.apk`](https://github.com/Meralchen/courier/releases/download/courier-latest/Courier-1.0-universal.apk) | 98.5 MB — both ARM ABIs in one file |
 | Debug | [`Courier-1.0-debug.apk`](https://github.com/Meralchen/courier/releases/download/courier-latest/Courier-1.0-debug.apk) | 229 MB — debug build with diagnostics |
 
-`SHA256SUMS.txt` is published beside them. Requires Android 8.0+ (minSdk 26).
+`SHA256SUMS.txt` is published beside them — read it for the current checksums.
+Requires Android 8.0+ (minSdk 26).
 
 ### Why the stable APKs are small
 
