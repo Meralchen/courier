@@ -4,12 +4,20 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+// Telegram application credentials. The defaults are the ones the OwpenGram
+// Android client publishes (github.com/owpengram/owpengram-android-client), so a
+// build of Courier works without asking the user for api_id/api_hash first.
+// They are registered to the OwpenGram application: replace them with your own
+// pair from my.telegram.org before publishing your own build.
+val defaultApiId: String = "3893395"
+val defaultApiHash: String = "e2adbe11ee0f092ced6043c4e051fdda"
+
 val courierApiId: String = (project.findProperty("COURIER_API_ID") as String?)
     ?: System.getenv("COURIER_API_ID")
-    ?: ""
+    ?: defaultApiId
 val courierApiHash: String = (project.findProperty("COURIER_API_HASH") as String?)
     ?: System.getenv("COURIER_API_HASH")
-    ?: ""
+    ?: defaultApiHash
 
 android {
     namespace = "com.courier.messenger"
