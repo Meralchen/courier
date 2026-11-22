@@ -9,24 +9,32 @@ import '../../telegram/telegram_store.dart';
 import '../components/ios_ui.dart';
 import '../components/pressable.dart';
 
-/// The sticker keyboard iOS shows above the composer: a Stickers tab with
-/// recent and installed sets, and an Emoji tab that types into the draft.
+/// The sticker keyboard iOS shows above the composer: GIFs, Stickers and Emoji
+/// tabs. GIFs are the account's saved animations, stickers are the recent and
+/// installed sets, and emoji types into the draft.
 Future<void> showStickerPanel(
   BuildContext context, {
   required TelegramStore store,
   required ValueChanged<StickerItem> onSticker,
   required ValueChanged<String> onEmoji,
+  ValueChanged<GifItem>? onGif,
 }) async {
-  // Open immediately and let the grid fill in: TDLib answers the sticker query
-  // a moment later, and waiting on it would leave the button feeling dead.
+  // Open immediately and let the grids fill in: TDLib answers the sticker and
+  // GIF queries a moment later, and waiting on them would leave the button
+  // feeling dead.
   unawaited(store.loadStickers());
+  unawaited(store.loadGifs());
   await showModalBottomSheet<void>(
     context: context,
     backgroundColor: Colors.transparent,
     isScrollControlled: true,
     useSafeArea: true,
-    builder: (BuildContext sheetContext) =>
-        _StickerSheet(store: store, onSticker: onSticker, onEmoji: onEmoji),
+    builder: (BuildContext sheetContext) => _StickerSheet(
+      store: store,
+      onSticker: onSticker,
+      onEmoji: onEmoji,
+      onGif: onGif,
+    ),
   );
 }
 
@@ -86,22 +94,30 @@ class _StickerSheet extends StatefulWidget {
     required this.store,
     required this.onSticker,
     required this.onEmoji,
+    this.onGif,
   });
 
   final TelegramStore store;
   final ValueChanged<StickerItem> onSticker;
   final ValueChanged<String> onEmoji;
+  final ValueChanged<GifItem>? onGif;
 
   @override
   State<_StickerSheet> createState() => _StickerSheetState();
 }
 
 class _StickerSheetState extends State<_StickerSheet> {
-  int _tab = 0;
+  /// 0 GIFs, 1 Stickers, 2 Emoji. iOS opens on Stickers.
+  int _tab = 1;
 
   void _send(StickerItem sticker) {
     Navigator.of(context).pop();
     widget.onSticker(sticker);
+  }
+
+  void _sendGif(GifItem gif) {
+    Navigator.of(context).pop();
+    widget.onGif?.call(gif);
   }
 
   @override
@@ -128,8 +144,8 @@ class _StickerSheetState extends State<_StickerSheet> {
                     children: <Widget>[
                       Expanded(
                         child: IosSegmented<int>(
-                          values: const <int>[0, 1],
-                          labels: const <String>['Stickers', 'Emoji'],
+                          values: const <int>[0, 1, 2],
+                          labels: const <String>['GIFs', 'Stickers', 'Emoji'],
                           selected: _tab,
                           onChanged: (int value) =>
                               setState(() => _tab = value),
@@ -147,9 +163,11 @@ class _StickerSheetState extends State<_StickerSheet> {
                   ),
                 ),
                 Expanded(
-                  child: _tab == 0
-                      ? _stickers(context, colors)
-                      : _emojiGrid(colors),
+                  child: switch (_tab) {
+                    0 => _gifs(colors),
+                    1 => _stickers(context, colors),
+                    _ => _emojiGrid(colors),
+                  },
                 ),
               ],
             ),
@@ -190,6 +208,44 @@ class _StickerSheetState extends State<_StickerSheet> {
               _grid(pack.stickers),
             ],
           ],
+        );
+      },
+    );
+  }
+
+  Widget _gifs(AppColors colors) {
+    return ListenableBuilder(
+      listenable: widget.store,
+      builder: (BuildContext context, Widget? child) {
+        final List<GifItem> gifs = widget.store.savedGifs;
+        if (gifs.isEmpty) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 40),
+              child: Text(
+                widget.onGif == null
+                    ? 'GIFs are available in chats.'
+                    : 'No saved GIFs yet. GIFs you save in Telegram appear here.',
+                textAlign: TextAlign.center,
+                style: AppText.subhead.copyWith(color: colors.textSecondary),
+              ),
+            ),
+          );
+        }
+        return GridView.builder(
+          padding: const EdgeInsets.fromLTRB(10, 4, 10, 14),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            mainAxisSpacing: 6,
+            crossAxisSpacing: 6,
+            childAspectRatio: 1.5,
+          ),
+          itemCount: gifs.length,
+          itemBuilder: (BuildContext context, int index) => _GifCell(
+            gif: gifs[index],
+            store: widget.store,
+            onTap: () => _sendGif(gifs[index]),
+          ),
         );
       },
     );
@@ -245,6 +301,102 @@ class _StickerSheetState extends State<_StickerSheet> {
       ),
     );
   }
+}
+
+class _GifCell extends StatefulWidget {
+  const _GifCell({required this.gif, required this.store, required this.onTap});
+
+  final GifItem gif;
+  final TelegramStore store;
+  final VoidCallback onTap;
+
+  @override
+  State<_GifCell> createState() => _GifCellState();
+}
+
+class _GifCellState extends State<_GifCell> {
+  @override
+  void initState() {
+    super.initState();
+    if (widget.gif.thumbnailFileId > 0) {
+      widget.store.ensureFile(widget.gif.thumbnailFileId);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final AppColors colors = AppColors.of(context);
+    final String path = widget.gif.thumbnailPath.isNotEmpty
+        ? widget.gif.thumbnailPath
+        : widget.store.filePaths[widget.gif.thumbnailFileId] ?? '';
+    return Pressable(
+      onTap: widget.onTap,
+      scale: 0.95,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: ColoredBox(
+          color: colors.dark
+              ? Colors.white.withValues(alpha: 0.05)
+              : Colors.black.withValues(alpha: 0.04),
+          child: Stack(
+            fit: StackFit.expand,
+            children: <Widget>[
+              if (path.isEmpty)
+                Center(
+                  child: Icon(
+                    Icons.gif_box_outlined,
+                    size: 28,
+                    color: colors.textTertiary,
+                  ),
+                )
+              else
+                Image.file(
+                  File(path),
+                  fit: BoxFit.cover,
+                  errorBuilder: (BuildContext _, Object __, StackTrace? ___) =>
+                      Center(
+                        child: Icon(
+                          Icons.gif_box_outlined,
+                          size: 28,
+                          color: colors.textTertiary,
+                        ),
+                      ),
+                ),
+              if (widget.gif.duration > 0)
+                Positioned(
+                  left: 5,
+                  bottom: 5,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 5,
+                      vertical: 1,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.55),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      durationLabel(widget.gif.duration),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+String durationLabel(int seconds) {
+  final int minutes = seconds ~/ 60;
+  final int rest = seconds % 60;
+  return '$minutes:${rest.toString().padLeft(2, '0')}';
 }
 
 class _StickerCell extends StatefulWidget {

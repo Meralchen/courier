@@ -33,6 +33,32 @@ internal fun TelegramEngine.handle(
             refreshChats()
             result.success(null)
         }
+        "setArchived" -> {
+            setArchived(long("chatId"), bool("archived"))
+            result.success(null)
+        }
+        "folders" -> requestFolders(result)
+        "openFolder" -> openFolder(int("folderId"), result)
+        "gifs" -> requestSavedGifs(result)
+        "sendGif" -> sendGif(
+            long("chatId"),
+            int("fileId"),
+            int("width"),
+            int("height"),
+            int("duration"),
+            result,
+        )
+        "reactions" -> requestAvailableReactions(
+            long("chatId"),
+            long("messageId"),
+            result,
+        )
+        "react" -> toggleReaction(
+            long("chatId"),
+            long("messageId"),
+            string("emoji"),
+            result,
+        )
         "openChat" -> {
             openChat(long("chatId"))
             result.success(null)
@@ -53,6 +79,19 @@ internal fun TelegramEngine.handle(
             string("path"),
             string("caption"),
             long("replyToId"),
+            result,
+        )
+        "sendVoice" -> sendVoice(
+            long("chatId"),
+            string("path"),
+            int("duration"),
+            long("replyToId"),
+            result,
+        )
+        "forward" -> forwardMessages(
+            long("fromChatId"),
+            ids("messageIds"),
+            long("toChatId"),
             result,
         )
         "editMessage" -> editMessage(

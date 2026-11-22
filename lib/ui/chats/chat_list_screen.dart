@@ -11,6 +11,7 @@ import '../chat/chat_screen.dart';
 import '../components/ios_ui.dart';
 import '../components/pressable.dart';
 import '../components/sheets.dart';
+import 'archive_screen.dart';
 import 'chat_row.dart';
 import 'new_chat_screen.dart';
 import 'stories_row.dart';
@@ -30,6 +31,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
   final FocusNode _searchFocus = FocusNode();
   String _query = '';
   ChatFilter _filter = ChatFilter.all;
+  int? _folderId;
   bool _editing = false;
   final Set<int> _selected = <int>{};
 
@@ -51,15 +53,27 @@ class _ChatListScreenState extends State<ChatListScreen> {
       ChatFilter.private =>
         source.where((ChatSummary chat) => chat.isPrivate).toList(),
     };
+    final List<ChatSummary> scoped = _folderId == null
+        ? filtered
+        : filtered
+              .where((ChatSummary chat) => chat.folders.contains(_folderId))
+              .toList();
     final String needle = _query.trim().toLowerCase();
-    if (needle.isEmpty) return filtered;
-    return filtered
+    if (needle.isEmpty) return scoped;
+    return scoped
         .where(
           (ChatSummary chat) =>
               chat.title.toLowerCase().contains(needle) ||
               chat.preview.toLowerCase().contains(needle),
         )
         .toList();
+  }
+
+  void _selectFolder(int? folderId) {
+    setState(() => _folderId = folderId);
+    if (folderId != null) {
+      TelegramScope.read(context).openFolder(folderId);
+    }
   }
 
   void _toggleEdit() {
@@ -128,7 +142,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
     return StoreSelector<Object>(
       select: (TelegramStore store) =>
           '${store.chatsVersion}|${store.storiesVersion}|'
-          '${store.totalUnread}|${store.connection}',
+          '${store.totalUnread}|${store.connection}|${store.foldersVersion}',
       builder: (BuildContext context, Object _) => _build(context, store),
     );
   }
@@ -148,6 +162,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
     final String emptyTitle = _query.trim().isNotEmpty
         ? 'No results'
+        : _folderId != null
+        ? 'This folder is empty'
         : switch (_filter) {
             ChatFilter.all => 'No chats yet',
             ChatFilter.unread => 'Nothing unread',
@@ -181,6 +197,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
                   filter: _filter,
                   onFilter: (ChatFilter value) =>
                       setState(() => _filter = value),
+                  folders: store.folders,
+                  folderId: _folderId,
+                  onFolder: _selectFolder,
                   unreadCount: unreadCount,
                   groupCount: groupCount,
                   privateCount: privateCount,
@@ -197,6 +216,17 @@ class _ChatListScreenState extends State<ChatListScreen> {
                       CupertinoPageRoute<void>(
                         builder: (BuildContext _) =>
                             ChatScreen(chatId: story.chatId),
+                      ),
+                    ),
+                  ),
+                ),
+              if (store.archivedChats.isNotEmpty && !_editing)
+                SliverToBoxAdapter(
+                  child: _ArchiveRow(
+                    unread: store.archivedUnread,
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (BuildContext _) => const ArchiveScreen(),
                       ),
                     ),
                   ),
@@ -330,6 +360,9 @@ class _ChatsHeader extends SliverPersistentHeaderDelegate {
     required this.editing,
     required this.onEdit,
     required this.onCompose,
+    required this.folders,
+    required this.folderId,
+    required this.onFolder,
   });
 
   final TextEditingController controller;
@@ -345,6 +378,9 @@ class _ChatsHeader extends SliverPersistentHeaderDelegate {
   final bool editing;
   final VoidCallback onEdit;
   final VoidCallback onCompose;
+  final List<ChatFolder> folders;
+  final int? folderId;
+  final ValueChanged<int?> onFolder;
 
   static const double _height = 136;
 
@@ -437,33 +473,57 @@ class _ChatsHeader extends SliverPersistentHeaderDelegate {
                   physics: const BouncingScrollPhysics(),
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   children: <Widget>[
-                    _FilterChip(
-                      label: 'All',
-                      selected: filter == ChatFilter.all,
-                      onTap: () => onFilter(ChatFilter.all),
-                      colors: colors,
-                    ),
-                    _FilterChip(
-                      label: 'Unread',
-                      count: unreadCount,
-                      selected: filter == ChatFilter.unread,
-                      onTap: () => onFilter(ChatFilter.unread),
-                      colors: colors,
-                    ),
-                    _FilterChip(
-                      label: 'Groups',
-                      count: groupCount,
-                      selected: filter == ChatFilter.groups,
-                      onTap: () => onFilter(ChatFilter.groups),
-                      colors: colors,
-                    ),
-                    _FilterChip(
-                      label: 'Private',
-                      count: privateCount,
-                      selected: filter == ChatFilter.private,
-                      onTap: () => onFilter(ChatFilter.private),
-                      colors: colors,
-                    ),
+                    // Accounts with folders get the folder tabs iOS shows
+                    // instead of the fixed filters; the Edit chip ends the row.
+                    if (folders.isEmpty) ...<Widget>[
+                      _FilterChip(
+                        label: 'All',
+                        selected: filter == ChatFilter.all,
+                        onTap: () => onFilter(ChatFilter.all),
+                        colors: colors,
+                      ),
+                      _FilterChip(
+                        label: 'Unread',
+                        count: unreadCount,
+                        selected: filter == ChatFilter.unread,
+                        onTap: () => onFilter(ChatFilter.unread),
+                        colors: colors,
+                      ),
+                      _FilterChip(
+                        label: 'Groups',
+                        count: groupCount,
+                        selected: filter == ChatFilter.groups,
+                        onTap: () => onFilter(ChatFilter.groups),
+                        colors: colors,
+                      ),
+                      _FilterChip(
+                        label: 'Private',
+                        count: privateCount,
+                        selected: filter == ChatFilter.private,
+                        onTap: () => onFilter(ChatFilter.private),
+                        colors: colors,
+                      ),
+                    ] else ...<Widget>[
+                      _FilterChip(
+                        label: 'All',
+                        selected: folderId == null,
+                        onTap: () => onFolder(null),
+                        colors: colors,
+                      ),
+                      for (final ChatFolder folder in folders)
+                        _FilterChip(
+                          label: folder.title,
+                          selected: folderId == folder.id,
+                          onTap: () => onFolder(folder.id),
+                          colors: colors,
+                        ),
+                      _FilterChip(
+                        label: 'Edit',
+                        selected: false,
+                        onTap: onEdit,
+                        colors: colors,
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -489,7 +549,86 @@ class _ChatsHeader extends SliverPersistentHeaderDelegate {
       oldDelegate.groupCount != groupCount ||
       oldDelegate.privateCount != privateCount ||
       oldDelegate.colors.dark != colors.dark ||
-      oldDelegate.controller != controller;
+      oldDelegate.controller != controller ||
+      oldDelegate.folderId != folderId ||
+      oldDelegate.folders.length != folders.length;
+}
+
+/// iOS puts the archive at the top of the list: a grey rounded square with an
+/// archive box, the title, the unread total and a chevron.
+class _ArchiveRow extends StatelessWidget {
+  const _ArchiveRow({required this.unread, required this.onTap});
+
+  final int unread;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final AppColors colors = AppColors.of(context);
+    return Pressable(
+      onTap: onTap,
+      scale: 0.985,
+      child: Column(
+        children: <Widget>[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
+            child: Row(
+              children: <Widget>[
+                Container(
+                  width: 54,
+                  height: 54,
+                  decoration: BoxDecoration(
+                    color: colors.dark
+                        ? Colors.white.withValues(alpha: 0.08)
+                        : Colors.black.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(27),
+                  ),
+                  child: Icon(
+                    Icons.archive_outlined,
+                    color: colors.textSecondary,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 11),
+                Expanded(
+                  child: Text(
+                    'Archived Chats',
+                    style: AppText.title.copyWith(
+                      color: colors.textPrimary,
+                      fontSize: 16.5,
+                    ),
+                  ),
+                ),
+                if (unread > 0) ...<Widget>[
+                  Container(
+                    constraints: const BoxConstraints(minWidth: 21),
+                    height: 21,
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: colors.accent,
+                      borderRadius: BorderRadius.circular(11),
+                    ),
+                    child: Text(
+                      unread > 999 ? '999+' : '$unread',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                ],
+                Icon(Icons.chevron_right, size: 18, color: colors.textTertiary),
+              ],
+            ),
+          ),
+          const Hairline(indent: 79),
+        ],
+      ),
+    );
+  }
 }
 
 class _FilterChip extends StatelessWidget {

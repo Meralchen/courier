@@ -17,9 +17,15 @@ internal fun TelegramEngine.publishAuth() {
 }
 
 internal fun TelegramEngine.publishChats() {
+    // A chat belongs to exactly one of the main list and the archive. Publish
+    // both, each with the position that carries its pin state, and let the
+    // Flutter side split them into the list and the archive row.
     val ordered = chats.values.mapNotNull { chat ->
-        val position = chat.positions.firstOrNull { it.list is TdApi.ChatListMain }
-            ?: return@mapNotNull null
+        val archived = chat.chatLists.any { it is TdApi.ChatListArchive } ||
+            chat.positions.any { it.list is TdApi.ChatListArchive }
+        val position = chat.positions.firstOrNull {
+            if (archived) it.list is TdApi.ChatListArchive else it.list is TdApi.ChatListMain
+        } ?: return@mapNotNull null
         chat to position
     }.sortedWith(
         compareByDescending<Pair<TdApi.Chat, TdApi.ChatPosition>> { it.second.isPinned }
@@ -63,6 +69,7 @@ internal fun TelegramEngine.publishProfile() {
                 "phone" to user.phoneNumber,
                 "username" to (user.usernames?.activeUsernames?.firstOrNull() ?: ""),
                 "bio" to myBio,
+                "premium" to user.isPremium,
                 "photoFileId" to (user.profilePhoto?.small?.id ?: 0),
                 "photoPath" to TdFormat.localPath(user.profilePhoto?.small),
             ),

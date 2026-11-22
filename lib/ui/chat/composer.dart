@@ -19,6 +19,8 @@ class Composer extends StatefulWidget {
     required this.onTyping,
     this.sendingPhoto = false,
     this.onOpenStickers,
+    this.onVoiceStart,
+    this.onVoiceFinish,
   });
 
   final TextEditingController controller;
@@ -33,18 +35,79 @@ class Composer extends StatefulWidget {
   /// caller does not provide one.
   final Future<void> Function()? onOpenStickers;
 
+  /// Starts a voice recording. Returns false when the microphone was denied,
+  /// so the composer never shows a recording that is not happening.
+  final Future<bool> Function()? onVoiceStart;
+
+  /// Stops the recording. [send] is false when the gesture was cancelled.
+  final Future<void> Function(bool send)? onVoiceFinish;
+
   @override
   State<Composer> createState() => _ComposerState();
 }
 
 class _ComposerState extends State<Composer> {
   Timer? _typingTimer;
+  Timer? _recordTimer;
   bool _typing = false;
+  bool _recording = false;
+  int _recordSeconds = 0;
 
   @override
   void dispose() {
     _typingTimer?.cancel();
+    _recordTimer?.cancel();
+    if (_recording) widget.onVoiceFinish?.call(false);
     super.dispose();
+  }
+
+  void _notice(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        duration: const Duration(milliseconds: 1800),
+      ),
+    );
+  }
+
+  Future<void> _beginRecording() async {
+    final Future<bool> Function()? start = widget.onVoiceStart;
+    if (start == null) {
+      _notice('Hold the microphone to record a voice message');
+      return;
+    }
+    try {
+      final bool started = await start();
+      if (!started || !mounted) return;
+      setState(() {
+        _recording = true;
+        _recordSeconds = 0;
+      });
+      _recordTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted) setState(() => _recordSeconds++);
+      });
+    } catch (error) {
+      if (mounted) _notice('Could not record: $error');
+    }
+  }
+
+  Future<void> _finishRecording(bool send) async {
+    if (!_recording) return;
+    _recordTimer?.cancel();
+    setState(() {
+      _recording = false;
+      _recordSeconds = 0;
+    });
+    try {
+      await widget.onVoiceFinish?.call(send);
+    } catch (error) {
+      if (mounted) _notice('Could not send the voice message: $error');
+    }
+  }
+
+  String get _recordLabel {
+    final String seconds = (_recordSeconds % 60).toString().padLeft(2, '0');
+    return '${_recordSeconds ~/ 60}:$seconds';
   }
 
   void _changed(String value) {
@@ -153,6 +216,59 @@ class _ComposerState extends State<Composer> {
     _changed(text);
   }
 
+  Widget _actionButton({required bool hasText, required AppColors colors}) {
+    if (_recording) {
+      return GestureDetector(
+        onTap: () => _finishRecording(true),
+        child: Container(
+          width: 38,
+          height: 38,
+          margin: const EdgeInsets.only(left: 1, bottom: 1),
+          decoration: const BoxDecoration(
+            color: Colors.redAccent,
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(Icons.stop, color: Colors.white, size: 20),
+        ),
+      );
+    }
+    if (hasText) {
+      return GestureDetector(
+        onTap: () {
+          Haptics.light();
+          _send();
+        },
+        child: Container(
+          width: 38,
+          height: 38,
+          margin: const EdgeInsets.only(left: 1, bottom: 1),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: colors.accent,
+          ),
+          child: const Icon(Icons.arrow_upward, color: Colors.white, size: 20),
+        ),
+      );
+    }
+    // iOS records while the microphone is held; releasing sends.
+    return GestureDetector(
+      onTap: () => _notice('Hold the microphone to record a voice message'),
+      onLongPressStart: (LongPressStartDetails _) => _beginRecording(),
+      onLongPressEnd: (LongPressEndDetails _) => _finishRecording(true),
+      onLongPressCancel: () => _finishRecording(false),
+      child: Container(
+        width: 38,
+        height: 38,
+        margin: const EdgeInsets.only(left: 1, bottom: 1),
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: colors.textSecondary.withValues(alpha: 0.16),
+        ),
+        child: Icon(Icons.mic_none, color: colors.textSecondary, size: 20),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final AppColors colors = AppColors.of(context);
@@ -214,6 +330,54 @@ class _ComposerState extends State<Composer> {
                       icon: Icon(
                         Icons.close,
                         size: 17,
+                        color: colors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          if (_recording)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: colors.card,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: <BoxShadow>[
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.10),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: <Widget>[
+                    Container(
+                      width: 9,
+                      height: 9,
+                      decoration: const BoxDecoration(
+                        color: Colors.redAccent,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Recording  $_recordLabel',
+                      style: AppText.subhead.copyWith(
+                        color: colors.textPrimary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      'Release to send',
+                      style: AppText.caption.copyWith(
                         color: colors.textSecondary,
                       ),
                     ),
@@ -311,37 +475,7 @@ class _ComposerState extends State<Composer> {
                   valueListenable: widget.controller,
                   builder: (BuildContext context, TextEditingValue value, _) {
                     final bool hasText = value.text.trim().isNotEmpty;
-                    return GestureDetector(
-                      onTap: hasText
-                          ? () {
-                              Haptics.light();
-                              _send();
-                            }
-                          : () => ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Voice messages are not part of this build yet.',
-                                ),
-                              ),
-                            ),
-                      child: AnimatedContainer(
-                        duration: Motion.fast,
-                        width: 38,
-                        height: 38,
-                        margin: const EdgeInsets.only(left: 1, bottom: 1),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: hasText
-                              ? colors.accent
-                              : colors.textSecondary.withValues(alpha: 0.16),
-                        ),
-                        child: Icon(
-                          hasText ? Icons.arrow_upward : Icons.mic_none,
-                          color: hasText ? Colors.white : colors.textSecondary,
-                          size: 20,
-                        ),
-                      ),
-                    );
+                    return _actionButton(hasText: hasText, colors: colors);
                   },
                 ),
               ],

@@ -121,6 +121,8 @@ class ChatSummary {
     required this.isGroup,
     required this.memberCount,
     required this.lastSeen,
+    this.archived = false,
+    this.folders = const <int>[],
   });
 
   factory ChatSummary.fromMap(Map<String, Object?> m) => ChatSummary(
@@ -145,6 +147,8 @@ class ChatSummary {
     isGroup: asBool(m['isGroup']),
     memberCount: asInt(m['memberCount']),
     lastSeen: asInt(m['lastSeen']),
+    archived: asBool(m['archived']),
+    folders: asList(m['folders']).map((Object? id) => asInt(id)).toList(),
   );
 
   final int id;
@@ -169,6 +173,12 @@ class ChatSummary {
   final int memberCount;
   final int lastSeen;
 
+  /// Archived chats live in TDLib's second chat list, never in the main one.
+  final bool archived;
+
+  /// Ids of the chat folders this chat belongs to.
+  final List<int> folders;
+
   String get initials => initialsOf(title);
 
   ChatSummary copyWith({
@@ -184,6 +194,8 @@ class ChatSummary {
     int? readOutboxMaxId,
     int? readInboxMaxId,
     bool? unreadMention,
+    bool? archived,
+    List<int>? folders,
   }) => ChatSummary(
     id: id,
     title: title,
@@ -206,7 +218,85 @@ class ChatSummary {
     isGroup: isGroup,
     memberCount: memberCount,
     lastSeen: lastSeen,
+    archived: archived ?? this.archived,
+    folders: folders ?? this.folders,
   );
+}
+
+/// One account chat folder, as pushed by TDLib's `UpdateChatFolders`.
+class ChatFolder {
+  const ChatFolder({
+    required this.id,
+    required this.title,
+    this.icon = '',
+    this.colorId = 0,
+  });
+
+  factory ChatFolder.fromMap(Map<String, Object?> m) => ChatFolder(
+    id: asInt(m['id']),
+    title: asString(m['title'], 'Folder'),
+    icon: asString(m['icon']),
+    colorId: asInt(m['colorId']),
+  );
+
+  final int id;
+  final String title;
+  final String icon;
+  final int colorId;
+}
+
+/// One saved GIF from `GetSavedAnimations`.
+class GifItem {
+  const GifItem({
+    required this.fileId,
+    this.thumbnailFileId = 0,
+    this.thumbnailPath = '',
+    this.width = 0,
+    this.height = 0,
+    this.duration = 0,
+    this.fileName = '',
+    this.fileSize = 0,
+  });
+
+  factory GifItem.fromMap(Map<String, Object?> m) => GifItem(
+    fileId: asInt(m['fileId']),
+    thumbnailFileId: asInt(m['thumbnailFileId']),
+    thumbnailPath: asString(m['thumbnailPath']),
+    width: asInt(m['width']),
+    height: asInt(m['height']),
+    duration: asInt(m['duration']),
+    fileName: asString(m['fileName']),
+    fileSize: asInt(m['fileSize']),
+  );
+
+  final int fileId;
+  final int thumbnailFileId;
+  final String thumbnailPath;
+  final int width;
+  final int height;
+  final int duration;
+  final String fileName;
+  final int fileSize;
+}
+
+/// One counted emoji reaction on a message.
+class MessageReactionCount {
+  const MessageReactionCount({
+    required this.emoji,
+    required this.count,
+    this.chosen = false,
+  });
+
+  factory MessageReactionCount.fromMap(Map<String, Object?> m) =>
+      MessageReactionCount(
+        emoji: asString(m['emoji']),
+        count: asInt(m['count']),
+        chosen: asBool(m['chosen']),
+      );
+
+  final String emoji;
+  final int count;
+  final bool chosen;
 }
 
 class Message {
@@ -236,6 +326,7 @@ class Message {
     required this.isService,
     required this.read,
     required this.isChannelPost,
+    this.reactions = const <MessageReactionCount>[],
   });
 
   factory Message.fromMap(Map<String, Object?> m) => Message(
@@ -264,6 +355,9 @@ class Message {
     isService: asBool(m['isService']),
     read: asBool(m['read']),
     isChannelPost: asBool(m['isChannelPost']),
+    reactions: asList(
+      m['reactions'],
+    ).map((Object? item) => MessageReactionCount.fromMap(asMap(item))).toList(),
   );
 
   final int id;
@@ -291,6 +385,7 @@ class Message {
   final bool isService;
   final bool read;
   final bool isChannelPost;
+  final List<MessageReactionCount> reactions;
 
   bool get hasPhoto =>
       kind == 'photo' || kind == 'video' || kind == 'animation';
@@ -323,6 +418,7 @@ class Message {
     isService: isService,
     read: read ?? this.read,
     isChannelPost: isChannelPost,
+    reactions: reactions,
   );
 }
 
@@ -336,6 +432,7 @@ class Profile {
     required this.bio,
     required this.photoFileId,
     required this.photoPath,
+    this.premium = false,
   });
 
   factory Profile.fromMap(Map<String, Object?> m) => Profile(
@@ -347,6 +444,7 @@ class Profile {
     bio: asString(m['bio']),
     photoFileId: asInt(m['photoFileId']),
     photoPath: asString(m['photoPath']),
+    premium: asBool(m['premium']),
   );
 
   final int id;
@@ -357,6 +455,7 @@ class Profile {
   final String bio;
   final int photoFileId;
   final String photoPath;
+  final bool premium;
 
   String get name {
     final String full = '$firstName $lastName'.trim();

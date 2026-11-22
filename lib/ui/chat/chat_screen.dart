@@ -7,16 +7,19 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/format.dart';
 import '../../core/motion.dart';
 import '../../core/theme.dart';
+import '../../core/wallpaper.dart';
 import '../../state/app_settings.dart';
 import '../../state/scopes.dart';
 import '../../telegram/models.dart';
 import '../../telegram/telegram_store.dart';
+import '../../telegram/voice_recorder.dart';
 import '../components/glass.dart';
 import '../components/photo_viewer.dart';
 import '../components/sheets.dart';
 import 'chat_header.dart';
 import 'chat_info_screen.dart';
 import 'composer.dart';
+import 'forward_screen.dart';
 import 'message_actions.dart';
 import 'sticker_panel.dart';
 import 'message_bubble.dart';
@@ -165,6 +168,46 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     }
   }
 
+  Future<bool> _startVoice() async {
+    try {
+      await VoiceRecorder.start();
+      return true;
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$error')));
+      }
+      return false;
+    }
+  }
+
+  Future<void> _finishVoice(bool send) async {
+    VoiceClip? clip;
+    try {
+      clip = await VoiceRecorder.stop();
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Recording failed: $error')));
+      }
+      return;
+    }
+    if (clip == null) return;
+    if (!send) {
+      // A cancelled gesture still produced a file; TDLib never sees it.
+      return;
+    }
+    if (!mounted) return;
+    final int? replyId = _reply?.id;
+    setState(() => _reply = null);
+    await TelegramScope.read(
+      context,
+    ).sendVoice(widget.chatId, clip.path, clip.duration, replyToId: replyId);
+    if (mounted) _scheduleJump(animate: true);
+  }
+
   Future<void> _send(String text) async {
     final int? replyId = _reply?.id;
     _draft.clear();
@@ -184,6 +227,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         await store.sendSticker(widget.chatId, sticker);
         if (mounted) _scheduleJump(animate: true);
       },
+      onGif: (GifItem gif) async {
+        await store.sendGif(widget.chatId, gif);
+        if (mounted) _scheduleJump(animate: true);
+      },
       onEmoji: (String emoji) {
         final TextEditingValue value = _draft.value;
         final int offset = value.selection.baseOffset < 0
@@ -197,9 +244,28 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     );
   }
 
+  Future<void> _react(Message message, TelegramStore store) async {
+    List<String> emojis = await store.availableReactions(
+      widget.chatId,
+      message.id,
+    );
+    if (emojis.isEmpty) {
+      emojis = const <String>['👍', '❤️', '🔥', '🎉', '😂', '😮', '😢', '🙏'];
+    }
+    if (!mounted) return;
+    final String? emoji = await showReactionPicker(context, emojis);
+    if (emoji == null) return;
+    await store.toggleReaction(widget.chatId, message.id, emoji);
+  }
+
   Future<void> _actions(Message message) async {
     final TelegramStore store = TelegramScope.read(context);
     final List<SheetAction<String>> actions = <SheetAction<String>>[
+      const SheetAction<String>(
+        label: 'React',
+        icon: Icons.add_reaction_outlined,
+        value: 'react',
+      ),
       if (message.text.isNotEmpty)
         const SheetAction<String>(
           label: 'Copy',
@@ -210,6 +276,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         label: 'Reply',
         icon: Icons.reply,
         value: 'reply',
+      ),
+      const SheetAction<String>(
+        label: 'Forward',
+        icon: Icons.forward,
+        value: 'forward',
       ),
       if (message.outgoing &&
           message.kind == 'text' &&
@@ -234,10 +305,29 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     );
     if (action == null || !mounted) return;
     switch (action) {
+      case 'react':
+        await _react(message, store);
       case 'copy':
         await copyMessageText(context, message.text);
       case 'reply':
         setState(() => _reply = message);
+      case 'forward':
+        final bool? forwarded = await Navigator.of(context).push<bool>(
+          MaterialPageRoute<bool>(
+            builder: (BuildContext _) => ForwardScreen(
+              fromChatId: widget.chatId,
+              messageIds: <int>[message.id],
+            ),
+          ),
+        );
+        if (forwarded == true && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Message forwarded'),
+              duration: Duration(milliseconds: 1400),
+            ),
+          );
+        }
       case 'edit':
         final String? edited = await showEditMessageDialog(context, message);
         if (edited != null) {
@@ -307,6 +397,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           onLongPress: () => _actions(message),
           onPhotoTap: () =>
               openPhoto(context, path: imagePath, caption: message.text),
+          onReactionTap: (String emoji) =>
+              store.toggleReaction(widget.chatId, message.id, emoji),
         ),
       );
     }
@@ -319,8 +411,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     final AppColors colors = AppColors.of(context);
-    final bool classic =
-        SettingsScope.maybeOf(context)?.glassStyle == GlassStyle.classic;
+    final AppSettings? settings = SettingsScope.maybeOf(context);
     final TelegramStore store = TelegramScope.of(context);
     final ChatSummary? chat = store.chat(widget.chatId);
     final List<Message> messages = store.messagesFor(widget.chatId);
@@ -357,13 +448,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       body: Stack(
         children: <Widget>[
           Positioned.fill(
-            child: classic
-                ? ColoredBox(color: colors.chatBackdrop)
-                : LiquidWallpaper(
-                    base: colors.chatBackdrop,
-                    dark: colors.dark,
-                    intensity: 0.8,
-                  ),
+            child: ChatWallpaperBackdrop(
+              style: settings?.wallpaper ?? ChatWallpaper.doodle,
+              dark: colors.dark,
+              energySaving: settings?.energySaving ?? false,
+            ),
           ),
           Column(
             children: <Widget>[
@@ -415,6 +504,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 onTyping: (bool typing) =>
                     store.sendTyping(widget.chatId, typing),
                 onOpenStickers: _openStickers,
+                onVoiceStart: _startVoice,
+                onVoiceFinish: _finishVoice,
               ),
             ],
           ),

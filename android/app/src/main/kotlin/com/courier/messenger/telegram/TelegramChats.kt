@@ -6,6 +6,9 @@ import org.drinkless.tdlib.TdApi
 
 internal fun TelegramEngine.refreshChats(depth: Int = 0) {
     val c = client ?: return
+    // The archive is a separate TDLib list but shares the chat cache, so the
+    // archive row can be drawn from the same event as the main list.
+    if (depth == 0) refreshArchive()
     c.send(TdApi.GetChats(TdApi.ChatListMain(), 200)) { reply ->
         if (reply is TdApi.Chats) {
             reply.chatIds.forEach { id ->
@@ -167,6 +170,76 @@ internal fun TelegramEngine.sendPhoto(
                 emitError(replyMsg.message)
                 result.error("tdlib", replyMsg.message, null)
             } else result.success(null)
+        }
+    } ?: result.error("tdlib", "TDLib is not running", null)
+}
+
+internal fun TelegramEngine.sendVoice(
+    chatId: Long,
+    path: String,
+    duration: Int,
+    replyToId: Long,
+    result: MethodChannel.Result,
+) {
+    val note = TdApi.InputVoiceNote(
+        TdApi.InputFileLocal(path),
+        duration,
+        ByteArray(0),
+    )
+    val content = TdApi.InputMessageVoiceNote(
+        note,
+        TdApi.FormattedText("", emptyArray()),
+        null,
+    )
+    val reply = if (replyToId > 0L) {
+        TdApi.InputMessageReplyToMessage(replyToId, null, 0, null)
+    } else {
+        null
+    }
+    client?.send(TdApi.SendMessage(chatId, null, reply, null, null, content)) { replyMsg ->
+        main.post {
+            if (replyMsg is TdApi.Message) {
+                result.success(null)
+            } else if (replyMsg is TdApi.Error) {
+                emitError(replyMsg.message)
+                result.error("tdlib", replyMsg.message, null)
+            } else {
+                result.success(null)
+            }
+        }
+    } ?: result.error("tdlib", "TDLib is not running", null)
+}
+
+internal fun TelegramEngine.forwardMessages(
+    fromChatId: Long,
+    messageIds: List<Long>,
+    toChatId: Long,
+    result: MethodChannel.Result,
+) {
+    if (messageIds.isEmpty()) {
+        result.error("forward", "Choose at least one message", null)
+        return
+    }
+    client?.send(
+        TdApi.ForwardMessages(
+            toChatId,
+            null,
+            fromChatId,
+            messageIds.toLongArray(),
+            null,
+            false,
+            false,
+        ),
+    ) { reply ->
+        main.post {
+            if (reply is TdApi.Messages) {
+                result.success(null)
+            } else if (reply is TdApi.Error) {
+                emitError(reply.message)
+                result.error("tdlib", reply.message, null)
+            } else {
+                result.success(null)
+            }
         }
     } ?: result.error("tdlib", "TDLib is not running", null)
 }

@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../../core/theme.dart';
+import '../../core/wallpaper.dart';
 import '../../state/app_settings.dart';
 import '../../state/scopes.dart';
 import '../components/ios_ui.dart';
@@ -12,7 +13,7 @@ class AppearanceScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final AppColors colors = AppColors.of(context);
     final AppSettings settings = SettingsScope.of(context);
-    final bool liquid = settings.glassStyle == GlassStyle.liquid;
+    final bool liquid = settings.liquid;
     const List<({ThemeMode mode, String label, IconData icon})>
     options = <({ThemeMode mode, String label, IconData icon})>[
       (mode: ThemeMode.system, label: 'System', icon: Icons.brightness_auto),
@@ -51,6 +52,54 @@ class AppearanceScreen extends StatelessWidget {
                         'lightest option on slower phones.',
               style: AppText.footnote.copyWith(color: colors.textSecondary),
             ),
+          ),
+          const SectionLabel('Chat Wallpaper'),
+          SettingsGroup(
+            children: <Widget>[
+              for (final ({ChatWallpaper value, String label, IconData icon})
+                  item
+                  in <({ChatWallpaper value, String label, IconData icon})>[
+                    (
+                      value: ChatWallpaper.doodle,
+                      label: 'Telegram Doodle',
+                      icon: Icons.pattern,
+                    ),
+                    (
+                      value: ChatWallpaper.gradient,
+                      label: 'Colour Gradient',
+                      icon: Icons.gradient,
+                    ),
+                    (
+                      value: ChatWallpaper.plain,
+                      label: 'Plain',
+                      icon: Icons.crop_square,
+                    ),
+                  ])
+                SettingsRow(
+                  label: item.label,
+                  icon: item.icon,
+                  iconColor: colors.success,
+                  onTap: () => settings.setWallpaper(item.value),
+                  trailing: settings.wallpaper == item.value
+                      ? Icon(Icons.check, size: 19, color: colors.accent)
+                      : null,
+                ),
+            ],
+          ),
+          const SectionLabel('Energy Saving'),
+          SettingsGroup(
+            children: <Widget>[
+              SettingsToggle(
+                label: 'Energy Saving',
+                subtitle:
+                    'Drops the liquid material, the colour field and the '
+                    'animated tab lens.',
+                icon: Icons.battery_saver_outlined,
+                iconColor: colors.success,
+                value: settings.energySaving,
+                onChanged: settings.setEnergySaving,
+              ),
+            ],
           ),
           const SectionLabel('Theme'),
           SettingsGroup(

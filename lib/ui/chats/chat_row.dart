@@ -61,6 +61,13 @@ class ChatRow extends StatelessWidget {
           icon: Icons.done_all,
           value: 'read',
         ),
+        SheetAction<String>(
+          label: chat.archived ? 'Unarchive' : 'Archive',
+          icon: chat.archived
+              ? Icons.unarchive_outlined
+              : Icons.archive_outlined,
+          value: 'archive',
+        ),
         const SheetAction<String>(
           label: 'Clear history',
           icon: Icons.cleaning_services_outlined,
@@ -82,6 +89,10 @@ class ChatRow extends StatelessWidget {
         await store.setMuted(chat.id, !chat.muted);
       case 'read':
         await store.markRead(chat.id);
+      case 'archive':
+        await store.setArchived(chat.id, !chat.archived);
+        if (!context.mounted) return;
+        if (chat.archived) Navigator.of(context).maybePop();
       case 'clear':
         final bool ok = await showGlassConfirm(
           context,

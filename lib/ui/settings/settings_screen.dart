@@ -19,8 +19,10 @@ import 'about_screen.dart';
 import 'appearance_screen.dart';
 import 'data_storage_screen.dart';
 import 'edit_profile_screen.dart';
+import 'folders_screen.dart';
 import 'notifications_screen.dart';
 import 'privacy_screen.dart';
+import 'profile_qr.dart';
 import 'sessions_screen.dart';
 
 /// Telegram-iOS settings: a centred identity block with Edit in the nav-bar
@@ -92,8 +94,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 2, 10, 0),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
               children: <Widget>[
+                IconButton(
+                  onPressed: () => showProfileQr(context, me),
+                  tooltip: 'Show QR code',
+                  icon: Icon(
+                    Icons.qr_code_2,
+                    size: 22,
+                    color: colors.textPrimary,
+                  ),
+                ),
+                const Spacer(),
                 Pressable(
                   onTap: () => _push(const EditProfileScreen()),
                   child: Padding(
@@ -141,6 +152,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 _identity(me),
                 style: AppText.subhead.copyWith(color: colors.textSecondary),
               ),
+              if (me?.premium ?? false) ...<Widget>[
+                const SizedBox(height: 7),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 9,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: colors.accent.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      Icon(Icons.star, size: 12, color: colors.accent),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Telegram Premium',
+                        style: AppText.caption.copyWith(
+                          color: colors.accent,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 20),
             ],
           ),
@@ -189,6 +227,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 chevron: true,
                 onTap: () => _push(const SessionsScreen()),
               ),
+              SettingsRow(
+                label: 'Chat Folders',
+                subtitle: store.folders.isEmpty
+                    ? 'No folders on this account'
+                    : '${store.folders.length} folder'
+                          '${store.folders.length == 1 ? '' : 's'}',
+                icon: Icons.folder_outlined,
+                iconColor: colors.accent,
+                chevron: true,
+                onTap: () => _push(const FoldersScreen()),
+              ),
             ],
           ),
           const SizedBox(height: 18),
@@ -220,13 +269,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               SettingsRow(
                 label: 'Appearance',
-                value: settings.glassStyle == GlassStyle.liquid
-                    ? 'Liquid Glass'
-                    : 'Classic iOS',
+                value: settings.energySaving
+                    ? 'Energy Saving'
+                    : (settings.glassStyle == GlassStyle.liquid
+                          ? 'Liquid Glass'
+                          : 'Classic iOS'),
                 icon: Icons.brightness_6_outlined,
                 iconColor: colors.accent,
                 chevron: true,
                 onTap: () => _push(const AppearanceScreen()),
+              ),
+              SettingsToggle(
+                label: 'Energy Saving',
+                subtitle: settings.energySaving
+                    ? 'Reduced effects are on'
+                    : 'Reduce effects and animations',
+                icon: Icons.battery_saver_outlined,
+                iconColor: colors.success,
+                value: settings.energySaving,
+                onChanged: settings.setEnergySaving,
               ),
             ],
           ),

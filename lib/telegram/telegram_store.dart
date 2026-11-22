@@ -41,6 +41,9 @@ class TelegramStore extends ChangeNotifier {
 
   List<StickerItem> recentStickers = const <StickerItem>[];
   List<StickerPack> stickerPacks = const <StickerPack>[];
+  List<GifItem> savedGifs = const <GifItem>[];
+  List<ChatFolder> folders = const <ChatFolder>[];
+  int foldersVersion = 0;
 
   final List<StoryCircle> stories = <StoryCircle>[];
   int storiesVersion = 0;
@@ -60,7 +63,9 @@ class TelegramStore extends ChangeNotifier {
       auth.stage == AuthStage.waitPassword;
 
   List<ChatSummary> get chats {
-    final List<ChatSummary> list = _chats.values.toList();
+    final List<ChatSummary> list = _chats.values
+        .where((ChatSummary chat) => !chat.archived)
+        .toList();
     list.sort((ChatSummary a, ChatSummary b) {
       if (a.pinned != b.pinned) return a.pinned ? -1 : 1;
       return b.date.compareTo(a.date);
@@ -68,9 +73,26 @@ class TelegramStore extends ChangeNotifier {
     return list;
   }
 
+  /// TDLib's archive list, newest first. Pinned archived chats lead.
+  List<ChatSummary> get archivedChats {
+    final List<ChatSummary> list = _chats.values
+        .where((ChatSummary chat) => chat.archived)
+        .toList();
+    list.sort((ChatSummary a, ChatSummary b) {
+      if (a.pinned != b.pinned) return a.pinned ? -1 : 1;
+      return b.date.compareTo(a.date);
+    });
+    return list;
+  }
+
+  int get archivedUnread => archivedChats.fold<int>(
+    0,
+    (int sum, ChatSummary chat) => sum + (chat.muted ? 0 : chat.unread),
+  );
+
   List<ChatSummary> get contacts {
     final List<ChatSummary> list = _chats.values
-        .where((ChatSummary c) => c.isPrivate)
+        .where((ChatSummary c) => c.isPrivate && !c.archived)
         .toList();
     list.sort(
       (ChatSummary a, ChatSummary b) =>
@@ -82,7 +104,7 @@ class TelegramStore extends ChangeNotifier {
   List<ChatSummary> get pinned =>
       chats.where((ChatSummary chat) => chat.pinned).toList();
 
-  int get totalUnread => _chats.values.fold<int>(
+  int get totalUnread => chats.fold<int>(
     0,
     (int sum, ChatSummary chat) => sum + (chat.muted ? 0 : chat.unread),
   );
@@ -151,8 +173,18 @@ class TelegramStore extends ChangeNotifier {
     switch (event['type']) {
       case 'auth':
         final AuthStage before = auth.stage;
+        final bool becameReady =
+            auth.stage != AuthStage.ready && event['stage'] == 'ready';
         auth = AuthState.fromMap(event);
         _notify();
+        if (becameReady) {
+          // Folder tabs and the sticker keyboard are part of the signed-in
+          // shell, so load them as soon as TDLib accepts the session.
+          Future<void>.microtask(() async {
+            await loadFolders();
+            await refreshChats();
+          });
+        }
         // TDLib closes itself after logout; a fresh client is needed to log in
         // again without restarting the app.
         if (auth.stage == AuthStage.closed && before != AuthStage.closed) {
@@ -229,6 +261,13 @@ class TelegramStore extends ChangeNotifier {
         _notify();
       case 'stickers':
         _applyStickers(asMap(event['stickers']));
+      case 'folders':
+        _applyFolders(asList(event['folders']));
+      case 'gifs':
+        savedGifs = asList(
+          event['gifs'],
+        ).map((Object? item) => GifItem.fromMap(asMap(item))).toList();
+        _notify();
       case 'stories':
         _applyStories(asList(event['stories']));
       case 'storage':
@@ -278,6 +317,9 @@ class TelegramStore extends ChangeNotifier {
     _messages.clear();
     _chatInfos.clear();
     stories.clear();
+    savedGifs = const <GifItem>[];
+    folders = const <ChatFolder>[];
+    foldersVersion++;
     _storiesRequested = false;
     storiesVersion++;
     await _guard(() => _client.call('logOut'));
@@ -354,6 +396,29 @@ class TelegramStore extends ChangeNotifier {
     }),
   );
 
+  Future<void> sendVoice(
+    int chatId,
+    String path,
+    int duration, {
+    int? replyToId,
+  }) => _guard(
+    () => _client.call('sendVoice', <String, Object?>{
+      'chatId': chatId,
+      'path': path,
+      'duration': duration,
+      'replyToId': replyToId ?? 0,
+    }),
+  );
+
+  Future<void> forward(int fromChatId, List<int> messageIds, int toChatId) =>
+      _guard(
+        () => _client.call('forward', <String, Object?>{
+          'fromChatId': fromChatId,
+          'messageIds': messageIds,
+          'toChatId': toChatId,
+        }),
+      );
+
   Future<void> editMessage(int chatId, int messageId, String text) => _guard(
     () => _client.call('editMessage', <String, Object?>{
       'chatId': chatId,
@@ -366,6 +431,13 @@ class TelegramStore extends ChangeNotifier {
     () => _client.call('deleteMessages', <String, Object?>{
       'chatId': chatId,
       'messageIds': ids,
+    }),
+  );
+
+  Future<void> setArchived(int chatId, bool archived) => _guard(
+    () => _client.call('setArchived', <String, Object?>{
+      'chatId': chatId,
+      'archived': archived,
     }),
   );
 
@@ -473,6 +545,76 @@ class TelegramStore extends ChangeNotifier {
       'height': sticker.height,
     }),
   );
+
+  void _applyFolders(List<Object?> raw) {
+    folders = raw
+        .map((Object? item) => ChatFolder.fromMap(asMap(item)))
+        .toList();
+    foldersVersion++;
+    _notify();
+  }
+
+  /// Folder definitions are pushed by TDLib, but asking once at startup means
+  /// the tabs are there even if the update arrived before Flutter attached.
+  Future<void> loadFolders() async {
+    try {
+      final List<Object?>? raw = await _client.invoke<List<Object?>>('folders');
+      _applyFolders(raw ?? const <Object?>[]);
+    } catch (_) {
+      // Accounts without folders keep the built-in filter chips.
+    }
+  }
+
+  Future<void> openFolder(int folderId) => _guard(
+    () => _client.call('openFolder', <String, Object?>{'folderId': folderId}),
+  );
+
+  Future<void> loadGifs() async {
+    try {
+      final List<Object?>? raw = await _client.invoke<List<Object?>>('gifs');
+      savedGifs = (raw ?? const <Object?>[])
+          .map((Object? item) => GifItem.fromMap(asMap(item)))
+          .toList();
+      _notify();
+    } catch (_) {
+      // The GIF tab shows its empty state if the account has none.
+    }
+  }
+
+  Future<void> sendGif(int chatId, GifItem gif) => _guard(
+    () => _client.call('sendGif', <String, Object?>{
+      'chatId': chatId,
+      'fileId': gif.fileId,
+      'width': gif.width,
+      'height': gif.height,
+      'duration': gif.duration,
+    }),
+  );
+
+  /// The emoji row TDLib offers for this message.
+  Future<List<String>> availableReactions(int chatId, int messageId) async {
+    try {
+      final List<Object?>? raw = await _client.invoke<List<Object?>>(
+        'reactions',
+        <String, Object?>{'chatId': chatId, 'messageId': messageId},
+      );
+      return (raw ?? const <Object?>[])
+          .map((Object? item) => asString(asMap(item)['emoji']))
+          .where((String emoji) => emoji.isNotEmpty)
+          .toList();
+    } catch (_) {
+      return const <String>[];
+    }
+  }
+
+  Future<void> toggleReaction(int chatId, int messageId, String emoji) =>
+      _guard(
+        () => _client.call('react', <String, Object?>{
+          'chatId': chatId,
+          'messageId': messageId,
+          'emoji': emoji,
+        }),
+      );
 
   Future<int?> openSavedMessages() async {
     try {

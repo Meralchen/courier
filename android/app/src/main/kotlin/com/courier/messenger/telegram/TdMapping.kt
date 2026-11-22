@@ -11,7 +11,14 @@ internal fun TelegramEngine.ensureDownload(file: TdApi.File?, priority: Int = 1)
 
 internal fun TelegramEngine.chatMap(chat: TdApi.Chat): Map<String, Any?> {
     val last = chat.lastMessage
-    val position = chat.positions.firstOrNull { it.list is TdApi.ChatListMain }
+    val archived = chat.chatLists.any { it is TdApi.ChatListArchive } ||
+        chat.positions.any { it.list is TdApi.ChatListArchive }
+    val position = chat.positions.firstOrNull {
+        if (archived) it.list is TdApi.ChatListArchive else it.list is TdApi.ChatListMain
+    }
+    val folders = chat.chatLists
+        .filterIsInstance<TdApi.ChatListFolder>()
+        .map { it.chatFolderId }
     val user = (chat.type as? TdApi.ChatTypePrivate)?.let { users[it.userId] }
     val photo = chat.photo?.small ?: user?.profilePhoto?.small
     ensureDownload(photo)
@@ -37,6 +44,8 @@ internal fun TelegramEngine.chatMap(chat: TdApi.Chat): Map<String, Any?> {
         "unreadMention" to (chat.unreadMentionCount > 0),
         "memberCount" to 0,
         "lastSeen" to ((user?.status as? TdApi.UserStatusOffline)?.wasOnline ?: 0),
+        "archived" to archived,
+        "folders" to folders,
     )
 }
 
@@ -144,5 +153,14 @@ internal fun TelegramEngine.messageMap(
         "isService" to TdFormat.isService(content),
         "read" to (message.id <= readOutbox),
         "isChannelPost" to message.isChannelPost,
+        "reactions" to (message.interactionInfo?.reactions?.reactions ?: emptyArray<TdApi.MessageReaction>())
+            .mapNotNull { reaction ->
+                val emoji = reactionEmoji(reaction.type) ?: return@mapNotNull null
+                mapOf(
+                    "emoji" to emoji,
+                    "count" to reaction.totalCount,
+                    "chosen" to reaction.isChosen,
+                )
+            },
     )
 }

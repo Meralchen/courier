@@ -23,6 +23,10 @@ internal class TelegramEngine(internal val emit: (Map<String, Any?>) -> Unit) {
     internal val typingUntil = ConcurrentHashMap<Long, Long>()
     internal val requestedFiles = ConcurrentHashMap.newKeySet<Int>()
 
+    /** Chat folders arrive through `UpdateChatFolders`; keep them for the tabs. */
+    internal val chatFolders =
+        java.util.concurrent.CopyOnWriteArrayList<TdApi.ChatFolderInfo>()
+
     internal var client: Client? = null
     internal var appContext: Context? = null
     internal var apiId = 0
@@ -145,6 +149,15 @@ internal class TelegramEngine(internal val emit: (Map<String, Any?>) -> Unit) {
 
             is TdApi.UpdateChatAction -> onChatAction(update)
             is TdApi.UpdateChatActiveStories -> onActiveStories(update)
+            is TdApi.UpdateChatFolders -> onChatFolders(update)
+
+            is TdApi.UpdateMessageInteractionInfo -> {
+                messages[update.chatId]
+                    ?.firstOrNull { it.id == update.messageId }
+                    ?.let { it.interactionInfo = update.interactionInfo }
+                publishConversationIfOpen(update.chatId)
+                publishChats()
+            }
 
             is TdApi.UpdateUser -> {
                 users[update.user.id] = update.user
@@ -278,6 +291,7 @@ internal class TelegramEngine(internal val emit: (Map<String, Any?>) -> Unit) {
         publishProfile()
         publishConnection()
         publishChats()
+        publishFolders()
         publishDebug()
         val chatId = openChatId
         if (chatId != 0L) publishConversation(chatId)

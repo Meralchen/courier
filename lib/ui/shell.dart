@@ -82,8 +82,8 @@ class MainShellState extends State<MainShell> {
   @override
   Widget build(BuildContext context) {
     final AppColors colors = AppColors.of(context);
-    final bool classic =
-        SettingsScope.of(context).glassStyle == GlassStyle.classic;
+    final AppSettings settings = SettingsScope.of(context);
+    final bool classic = !settings.liquid;
 
     return Scaffold(
       backgroundColor: colors.background,

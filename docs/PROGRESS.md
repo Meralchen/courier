@@ -1,5 +1,38 @@
 # Courier progress
 
+## iOS parity pass (2026-11-22)
+
+Everything below runs on real TDLib calls, not local stand-ins:
+
+- **Archived chats.** `GetChats(ChatListArchive)` + `LoadChats` fill the same
+  chat cache; `TdApi.Chat.chatLists` marks archive membership, `AddChatToList`
+  moves a chat between the lists. The chat list shows the iOS archive row with
+  its unread total and opens a real archive screen; long-press offers
+  Archive/Unarchive.
+- **Chat folders.** `UpdateChatFolders` is cached in the engine and exposed as
+  folder tabs above the chat list and in Settings → Chat Folders. Opening a
+  folder uses `GetChats(ChatListFolder)`. Folder chips replace the fixed
+  filters on accounts that have folders, as in iOS.
+- **Saved GIFs.** `GetSavedAnimations` fills the sticker keyboard's GIF tab;
+  tapping one sends `InputMessageAnimation`.
+- **Reactions.** `GetMessageAvailableReactions` powers the picker, and
+  `AddMessageReaction` / `RemoveMessageReaction` toggle the account's reaction.
+  Counts and the chosen state are drawn under the bubble and updated from
+  `UpdateMessageInteractionInfo`.
+- **Voice messages.** The composer's microphone records through the platform
+  `MediaRecorder` (AAC in MPEG-4, microphone permission handled in
+  `MainActivity`) and sends `InputMessageVoiceNote`. Hold to record, release to
+  send; the recording runs long enough to include a real duration.
+- **Forwarding.** `ForwardMessages` behind the iOS "Forward to" chat picker.
+- **Wallpaper.** The green Telegram doodle pattern is painted once per size,
+  with gradient and plain alternatives in Appearance.
+- **Energy Saving.** One switch drops the liquid material, the colour field and
+  the tab lens while keeping the layout, matching iOS's reduced-effects mode.
+- **Profile QR.** The Settings bar's QR button opens a real QR code for the
+  account's `t.me` link.
+- **Premium badge.** `User.isPremium` from TDLib is shown under the profile; no
+  local guesswork.
+
 Updated for the Flutter rewrite. `[x]` implemented and compiled locally, `[~]`
 implemented but not verified against live Telegram, `[ ]` not implemented.
 
