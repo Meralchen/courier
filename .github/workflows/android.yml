@@ -11,14 +11,16 @@ permissions:
 
 env:
   FLUTTER_VERSION: "3.50.1"
-  STABLE_APK: Courier-1.0-stable.apk
+  UNIVERSAL_APK: Courier-1.0-universal.apk
+  ARM64_APK: Courier-1.0-arm64.apk
+  ARM_APK: Courier-1.0-arm.apk
   DEBUG_APK: Courier-1.0-debug.apk
 
 jobs:
   build:
     name: Build stable and debug
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -44,16 +46,23 @@ jobs:
       - name: Build debug APK
         run: flutter build apk --debug
 
-      - name: Build stable APK
-        run: flutter build apk --release
+      # Two release shapes: one universal APK for phones that should not have to
+      # know their ABI, and per-ABI APKs (R8-shrunk, single TDLib binary) that are
+      # roughly a third of the universal size.
+      - name: Build release APKs
+        run: |
+          mkdir -p dist
+          flutter build apk --release --target-platform android-arm,android-arm64
+          cp build/app/outputs/flutter-apk/app-release.apk "dist/${UNIVERSAL_APK}"
+          flutter build apk --release --split-per-abi --target-platform android-arm,android-arm64
+          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk "dist/${ARM64_APK}"
+          cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk "dist/${ARM_APK}"
 
       - name: Collect APKs
         run: |
-          mkdir -p dist
           cp build/app/outputs/flutter-apk/app-debug.apk "dist/${DEBUG_APK}"
-          cp build/app/outputs/flutter-apk/app-release.apk "dist/${STABLE_APK}"
           cd dist
-          sha256sum "${STABLE_APK}" "${DEBUG_APK}" > SHA256SUMS.txt
+          sha256sum "${UNIVERSAL_APK}" "${ARM64_APK}" "${ARM_APK}" "${DEBUG_APK}" > SHA256SUMS.txt
           ls -lh
           cat SHA256SUMS.txt
 
@@ -61,7 +70,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: courier-stable-apk
-          path: dist/${{ env.STABLE_APK }}
+          path: |
+            dist/${{ env.UNIVERSAL_APK }}
+            dist/${{ env.ARM64_APK }}
+            dist/${{ env.ARM_APK }}
           if-no-files-found: error
 
       - name: Upload debug APK
@@ -81,16 +93,26 @@ jobs:
             Courier rewritten in Flutter with the liquid-glass renderer and TDLib
             as the Telegram engine.
 
-            - `Courier-1.0-stable.apk` — release build (debug-signed so it installs
-              without a private keystore; not a Play Store upload).
+            Download the smallest APK that matches your phone:
+
+            - `Courier-1.0-arm64.apk` — 64-bit ARM (every phone from roughly 2017
+              on). **Start here.**
+            - `Courier-1.0-arm.apk` — 32-bit ARM, for older or low-end phones.
+            - `Courier-1.0-universal.apk` — both ARM ABIs in one file, if you are
+              not sure.
             - `Courier-1.0-debug.apk` — debug build for diagnostics.
-            - `SHA256SUMS.txt` — checksums for both files.
+
+            The stable APKs are R8-shrunk and debug-key signed so they install
+            without a private keystore; that is not a Play Store upload.
+            `SHA256SUMS.txt` has the checksums for every file.
 
             Both are built from `${{ github.sha }}`. Android 8.0+ (minSdk 26).
             Sign in with your own Telegram phone number; Telegram may ask for the
             login code and, if enabled, your 2FA password.
           files: |
-            dist/${{ env.STABLE_APK }}
+            dist/${{ env.UNIVERSAL_APK }}
+            dist/${{ env.ARM64_APK }}
+            dist/${{ env.ARM_APK }}
             dist/${{ env.DEBUG_APK }}
             dist/SHA256SUMS.txt
           fail_on_unmatched_files: true

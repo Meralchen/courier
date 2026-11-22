@@ -218,39 +218,59 @@ class _ComposerState extends State<Composer> {
                         ),
                 ),
                 Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 6),
-                    child: TextField(
-                      controller: widget.controller,
-                      onChanged: _changed,
-                      minLines: 1,
-                      maxLines: 5,
-                      textCapitalization: TextCapitalization.sentences,
-                      keyboardType: TextInputType.multiline,
-                      style: AppText.body.copyWith(
-                        color: colors.textPrimary,
-                        fontSize: 16,
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(vertical: 3),
+                    padding: const EdgeInsets.only(left: 13, right: 1),
+                    decoration: BoxDecoration(
+                      color: colors.textSecondary.withValues(
+                        alpha: colors.dark ? 0.20 : 0.11,
                       ),
-                      cursorColor: colors.accent,
-                      decoration: InputDecoration(
-                        isDense: true,
-                        border: InputBorder.none,
-                        hintText: 'Message',
-                        hintStyle: AppText.body.copyWith(
-                          color: colors.textSecondary,
-                          fontSize: 16,
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(vertical: 4),
-                      ),
+                      borderRadius: BorderRadius.circular(19),
                     ),
-                  ),
-                ),
-                IconButton(
-                  onPressed: _emojiGrid,
-                  icon: Icon(
-                    Icons.emoji_emotions_outlined,
-                    color: colors.textSecondary,
-                    size: 21,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: <Widget>[
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 5),
+                            child: TextField(
+                              controller: widget.controller,
+                              onChanged: _changed,
+                              minLines: 1,
+                              maxLines: 5,
+                              textCapitalization: TextCapitalization.sentences,
+                              keyboardType: TextInputType.multiline,
+                              style: AppText.body.copyWith(
+                                color: colors.textPrimary,
+                                fontSize: 16,
+                              ),
+                              cursorColor: colors.accent,
+                              decoration: InputDecoration(
+                                isDense: true,
+                                border: InputBorder.none,
+                                hintText: 'Message',
+                                hintStyle: AppText.body.copyWith(
+                                  color: colors.textSecondary,
+                                  fontSize: 16,
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  vertical: 5,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          onPressed: _emojiGrid,
+                          icon: Icon(
+                            Icons.emoji_emotions_outlined,
+                            color: colors.textSecondary,
+                            size: 21,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 ValueListenableBuilder<TextEditingValue>(

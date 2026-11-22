@@ -1,4 +1,5 @@
 import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:liquiglass/liquiglass.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../core/motion.dart';
@@ -79,65 +80,16 @@ class _ChatListScreenState extends State<ChatListScreen> {
                   await Future<void>.delayed(const Duration(milliseconds: 500));
                 },
               ),
-              SliverToBoxAdapter(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: <Widget>[
-                    LargeTitle(
-                      'Chats',
-                      trailing: Row(
-                        children: <Widget>[
-                          GlassCircleButton(
-                            icon: Icons.search,
-                            tooltip: 'Search',
-                            onTap: () => _searchFocus.requestFocus(),
-                          ),
-                          const SizedBox(width: 8),
-                          GlassCircleButton(
-                            icon: Icons.edit_outlined,
-                            tooltip: 'New message',
-                            color: colors.accent,
-                            onTap: _newChat,
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (store.connection != 'Connected')
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
-                        child: Row(
-                          children: <Widget>[
-                            Container(
-                              width: 6,
-                              height: 6,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: store.connection.contains('network')
-                                    ? colors.danger
-                                    : colors.textTertiary,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              store.connection,
-                              style: AppText.caption.copyWith(
-                                color: colors.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                  ],
-                ),
-              ),
               SliverPersistentHeader(
                 pinned: true,
-                delegate: _SearchHeader(
+                delegate: _ChatsHeader(
                   controller: _search,
                   focusNode: _searchFocus,
                   query: _query,
                   onChanged: (String value) => setState(() => _query = value),
                   colors: colors,
+                  connection: store.connection,
+                  onCompose: _newChat,
                 ),
               ),
               if (all.isEmpty)
@@ -208,13 +160,17 @@ class _ChatListScreenState extends State<ChatListScreen> {
   }
 }
 
-class _SearchHeader extends SliverPersistentHeaderDelegate {
-  _SearchHeader({
+/// Telegram-iOS chats header: the 34 pt title collapses into a centred nav-bar
+/// title over real glass while the search field stays put.
+class _ChatsHeader extends SliverPersistentHeaderDelegate {
+  _ChatsHeader({
     required this.controller,
     required this.focusNode,
     required this.query,
     required this.onChanged,
     required this.colors,
+    required this.connection,
+    required this.onCompose,
   });
 
   final TextEditingController controller;
@@ -222,12 +178,17 @@ class _SearchHeader extends SliverPersistentHeaderDelegate {
   final String query;
   final ValueChanged<String> onChanged;
   final AppColors colors;
+  final String connection;
+  final VoidCallback onCompose;
+
+  static const double _collapsed = 104;
+  static const double _expanded = 152;
 
   @override
-  double get minExtent => 56;
+  double get minExtent => _collapsed;
 
   @override
-  double get maxExtent => 56;
+  double get maxExtent => _expanded;
 
   @override
   Widget build(
@@ -235,35 +196,134 @@ class _SearchHeader extends SliverPersistentHeaderDelegate {
     double shrinkOffset,
     bool overlapsContent,
   ) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 6, 14, 8),
-      child: GlassField(
-        controller: controller,
-        focusNode: focusNode,
-        hint: 'Search for messages or users',
-        icon: Icons.search,
-        onChanged: onChanged,
-        suffix: query.isEmpty
-            ? null
-            : IconButton(
-                onPressed: () {
-                  controller.clear();
-                  onChanged('');
-                },
-                icon: Icon(
-                  Icons.close,
-                  size: 17,
-                  color: colors.textSecondary,
+    final double t = (shrinkOffset / (_expanded - _collapsed)).clamp(0.0, 1.0);
+    final bool online = connection == 'Connected' || connection == 'Updating';
+    return ClipRect(
+      child: Stack(
+        children: <Widget>[
+          Positioned.fill(
+            child: GlassSurface(
+              radius: 0,
+              dark: colors.dark,
+              tintAmount: 30 + 30 * t,
+              light: const Offset(0, -1),
+              materialize: 0.55 + 0.45 * t,
+              child: const SizedBox.expand(),
+            ),
+          ),
+          Positioned(
+            left: 18,
+            right: 12,
+            top: 6,
+            height: 46,
+            child: Row(
+              children: <Widget>[
+                Expanded(
+                  child: Stack(
+                    alignment: Alignment.centerLeft,
+                    children: <Widget>[
+                      Opacity(
+                        opacity: (1 - t * 1.3).clamp(0.0, 1.0),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: <Widget>[
+                            Text(
+                              'Chats',
+                              style: AppText.largeTitle.copyWith(
+                                color: colors.textPrimary,
+                                fontSize: 34 - 3 * t,
+                              ),
+                            ),
+                            if (!online) ...<Widget>[
+                              const SizedBox(width: 8),
+                              Container(
+                                width: 6,
+                                height: 6,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: connection.contains('network')
+                                      ? colors.danger
+                                      : colors.textTertiary,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      Align(
+                        alignment: Alignment.center,
+                        child: Opacity(
+                          opacity: t,
+                          child: Text(
+                            'Chats',
+                            style: AppText.title.copyWith(
+                              color: colors.textPrimary,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
+                GlassCircleButton(
+                  icon: Icons.search,
+                  size: 34,
+                  tooltip: 'Search',
+                  onTap: () => focusNode.requestFocus(),
+                ),
+                const SizedBox(width: 6),
+                GlassCircleButton(
+                  icon: Icons.edit_outlined,
+                  size: 34,
+                  tooltip: 'New message',
+                  color: colors.accent,
+                  onTap: onCompose,
+                ),
+              ],
+            ),
+          ),
+          Positioned(
+            left: 14,
+            right: 14,
+            bottom: 9,
+            height: 46,
+            child: GlassField(
+              controller: controller,
+              focusNode: focusNode,
+              hint: 'Search for messages or users',
+              icon: Icons.search,
+              onChanged: onChanged,
+              suffix: query.isEmpty
+                  ? null
+                  : IconButton(
+                      onPressed: () {
+                        controller.clear();
+                        onChanged('');
+                      },
+                      icon: Icon(
+                        Icons.close,
+                        size: 17,
+                        color: colors.textSecondary,
+                      ),
+                    ),
+            ),
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: Container(height: 0.6, color: colors.separator),
+          ),
+        ],
       ),
     );
   }
 
   @override
-  bool shouldRebuild(covariant _SearchHeader oldDelegate) =>
+  bool shouldRebuild(covariant _ChatsHeader oldDelegate) =>
       oldDelegate.query != query ||
       oldDelegate.colors.dark != colors.dark ||
+      oldDelegate.connection != connection ||
       oldDelegate.controller != controller;
 }
 

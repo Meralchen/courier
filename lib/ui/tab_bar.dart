@@ -1,9 +1,12 @@
 import 'package:material_ui/material_ui.dart';
 
+import '../core/motion.dart';
 import '../core/theme.dart';
 import 'components/glass.dart';
 import 'components/pressable.dart';
 
+/// Telegram-iOS tab bar: a floating glass bar where the selection is a lens that
+/// slides between slots instead of fading in place.
 class CourierTabBar extends StatelessWidget {
   const CourierTabBar({
     super.key,
@@ -52,21 +55,52 @@ class CourierTabBar extends StatelessWidget {
       ),
       child: GlassBar(
         radius: 30,
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 7),
-        child: Row(
-          children: <Widget>[
-            for (int i = 0; i < _tabs.length; i++)
-              Expanded(
-                child: _TabItem(
-                  icon: i == selected ? _tabs[i].active : _tabs[i].icon,
-                  label: _tabs[i].label,
-                  selected: i == selected,
-                  badge: i == 2 ? unread : 0,
-                  colors: colors,
-                  onTap: () => onSelect(i),
-                ),
+        tintAmount: colors.dark ? 66 : 54,
+        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 5),
+        child: LayoutBuilder(
+          builder: (BuildContext context, BoxConstraints constraints) {
+            final double slot = constraints.maxWidth / _tabs.length;
+            return SizedBox(
+              height: 52,
+              child: Stack(
+                children: <Widget>[
+                  AnimatedPositioned(
+                    duration: Motion.normal,
+                    curve: Motion.emphasized,
+                    left: selected * slot + 4,
+                    top: 3,
+                    bottom: 3,
+                    width: slot - 8,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(19),
+                        color: colors.accent.withValues(alpha: 0.16),
+                        border: Border.all(
+                          color: colors.accent.withValues(alpha: 0.22),
+                          width: 0.6,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Row(
+                    children: <Widget>[
+                      for (int i = 0; i < _tabs.length; i++)
+                        Expanded(
+                          child: _TabItem(
+                            icon: i == selected ? _tabs[i].active : _tabs[i].icon,
+                            label: _tabs[i].label,
+                            selected: i == selected,
+                            badge: i == 2 ? unread : 0,
+                            colors: colors,
+                            onTap: () => onSelect(i),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
               ),
-          ],
+            );
+          },
         ),
       ),
     );
@@ -94,27 +128,26 @@ class _TabItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return Pressable(
       onTap: onTap,
-      scale: 0.94,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 240),
-        curve: Curves.easeOutCubic,
-        padding: const EdgeInsets.symmetric(vertical: 5),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          color: selected
-              ? colors.accent.withValues(alpha: 0.14)
-              : Colors.transparent,
-        ),
+      scale: 0.92,
+      child: Semantics(
+        selected: selected,
+        button: true,
+        label: badge > 0 ? '$label, $badge unread' : label,
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
             Stack(
               clipBehavior: Clip.none,
               children: <Widget>[
-                Icon(
-                  icon,
-                  size: 23,
-                  color: selected ? colors.accent : colors.textSecondary,
+                AnimatedScale(
+                  scale: selected ? 1.06 : 1,
+                  duration: Motion.fast,
+                  curve: Motion.emphasized,
+                  child: Icon(
+                    icon,
+                    size: 23,
+                    color: selected ? colors.accent : colors.textSecondary,
+                  ),
                 ),
                 if (badge > 0)
                   Positioned(

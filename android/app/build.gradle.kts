@@ -18,10 +18,6 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-        ndk {
-            // The TDLib AAR ships these three; x86 is only useful on old emulators.
-            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
-        }
     }
 
     buildTypes {
@@ -30,8 +26,14 @@ android {
             // release APK is installable everywhere and is what "stable" means
             // here; swap in a real keystore for store distribution.
             signingConfig = signingConfigs.getByName("debug")
-            isMinifyEnabled = false
-            isShrinkResources = false
+            // Commercial Telegram clients ship R8-shrunk; only TDLib's JNI
+            // surface and the bridge need explicit keeps (proguard-rules.pro).
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
         }
     }
 

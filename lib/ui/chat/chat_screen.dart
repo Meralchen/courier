@@ -80,8 +80,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   void _onScroll() {
     if (!_scroll.hasClients) return;
-    _nearBottom =
+    final bool near =
         _scroll.position.maxScrollExtent - _scroll.position.pixels < 160;
+    if (near != _nearBottom) setState(() => _nearBottom = near);
     if (_scroll.position.pixels < 280) _loadMore();
   }
 
@@ -357,6 +358,17 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               ),
             ),
           ),
+          if (!_nearBottom)
+            Positioned(
+              right: 12,
+              bottom: MediaQuery.paddingOf(context).bottom + 78,
+              child: GlassCircleButton(
+                icon: Icons.keyboard_arrow_down,
+                size: 38,
+                tooltip: 'Scroll to latest',
+                onTap: () => _scheduleJump(animate: true),
+              ),
+            ),
           if (_loadingMore)
             Positioned(
               top: MediaQuery.paddingOf(context).top + 66,

@@ -14,27 +14,33 @@ imports `package:material_ui/material_ui.dart` and
 
 ### APKs
 
-Both APKs are built by the `Flutter APKs` workflow
-(`.github/workflows/android.yml`, run #14 on `cf946bb`) and attached to the
+The `Flutter APKs` workflow (`.github/workflows/android.yml`) builds four files
+and attaches them to the
 [`courier-latest` release](https://github.com/Meralchen/courier/releases/tag/courier-latest):
 
-- `Courier-1.0-stable.apk` — 120 MB, release build.
-- `Courier-1.0-debug.apk` — 229 MB, debug build.
-- `SHA256SUMS.txt` — checksums for the files currently attached; a rebuild
-  replaces the APKs and the sums together, so read this file rather than a
-  checksum copied into a document.
+- `Courier-1.0-arm64.apk` — stable, 64-bit ARM, one TDLib binary. Recommended.
+- `Courier-1.0-arm.apk` — stable, 32-bit ARM.
+- `Courier-1.0-universal.apk` — stable, both ARM ABIs in one file.
+- `Courier-1.0-debug.apk` — debug build; still carries x86_64 for emulators.
+- `SHA256SUMS.txt` — checksums for all four. A rebuild replaces the APKs and the
+  sums together, so read this file rather than a checksum copied into a document.
 
-Downloaded the published stable APK and inspected it with `aapt2`/`unzip`:
-package `com.courier.messenger`, version 1.0.0, targetSdk 36, `libtdjni.so` for
-arm64-v8a, armeabi-v7a and x86_64, and
-`assets/flutter_assets/packages/liquiglass/shaders/liquid_glass.frag`.
+The first universal build was 120 MB because it packed three TDLib binaries
+(`arm64-v8a`, `armeabi-v7a`, `x86_64`) and unshrunk dex. Release now runs R8 and
+resource shrinking and builds per ABI, so an arm64 phone downloads one binary.
+The published stable APK was inspected with `aapt2`/`unzip`: package
+`com.courier.messenger`, version 1.0.0, targetSdk 36,
+`assets/flutter_assets/packages/liquiglass/shaders/liquid_glass.frag`, and a
+single `libtdjni.so` in the per-ABI build.
 
-### Signing
+### Signing and shrinking
 
-- The stable APK uses the debug signing key because this repository has no owner
-  keystore; it installs normally but is not a Play Store upload.
-- Minification and resource shrinking are off, so TDLib's JNI classes are not
-  stripped accidentally.
+- The stable APKs use the debug signing key because this repository has no owner
+  keystore; they install normally but are not a Play Store upload.
+- R8 is on for release. `android/app/proguard-rules.pro` keeps
+  `org.drinkless.tdlib.**`, every class declaring native methods and the
+  `com.courier.messenger.telegram.**` bridge, so TDLib's JNI surface survives
+  shrinking.
 
 ## Phase 1 — Flutter rewrite
 

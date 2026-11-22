@@ -18,11 +18,27 @@ Two APKs are built by GitHub Actions and attached to the
 
 | Build | File | What it is |
 | --- | --- | --- |
-| Stable | [`Courier-1.0-stable.apk`](https://github.com/Meralchen/courier/releases/download/courier-latest/Courier-1.0-stable.apk) | Release build, debug-signed so it installs without a private keystore |
+| Stable, arm64 | [`Courier-1.0-arm64.apk`](https://github.com/Meralchen/courier/releases/download/courier-latest/Courier-1.0-arm64.apk) | 64-bit ARM, R8-shrunk with a single TDLib binary. **Start here.** |
+| Stable, arm 32-bit | [`Courier-1.0-arm.apk`](https://github.com/Meralchen/courier/releases/download/courier-latest/Courier-1.0-arm.apk) | For older or low-end phones |
+| Stable, universal | [`Courier-1.0-universal.apk`](https://github.com/Meralchen/courier/releases/download/courier-latest/Courier-1.0-universal.apk) | Both ARM ABIs in one file |
 | Debug | [`Courier-1.0-debug.apk`](https://github.com/Meralchen/courier/releases/download/courier-latest/Courier-1.0-debug.apk) | Debug build with diagnostics |
 
-`SHA256SUMS.txt` is published beside them. Requires Android 8.0+ (minSdk 26);
-the APK includes `arm64-v8a`, `armeabi-v7a` and `x86_64` TDLib binaries.
+`SHA256SUMS.txt` is published beside them. Requires Android 8.0+ (minSdk 26).
+
+### Why the stable APKs are small
+
+The first Flutter build packed three TDLib binaries (`arm64-v8a`,
+`armeabi-v7a`, `x86_64`) and unshrunk dex into one 120 MB file. The release now:
+
+- builds per ABI, so an arm64 phone downloads exactly one TDLib binary;
+- runs R8 (`isMinifyEnabled`) and resource shrinking, with keeps only for
+  TDLib's JNI surface, the `org.drinkless.tdlib` package and native methods
+  (`android/app/proguard-rules.pro`);
+- leaves x86_64 out of the stable builds entirely — it exists for emulators, and
+  the debug APK still contains it.
+
+The universal APK exists for people who do not know their ABI, and it is still
+smaller than the old build because of R8.
 
 ## What works
 
@@ -44,12 +60,17 @@ the APK includes `arm64-v8a`, `armeabi-v7a` and `x86_64` TDLib binaries.
   logout and re-login.
 
 **Interface**
-- `liquiglass` `GlassSurface` panels with the package's real fragment shader,
-  plus an animated colour wallpaper behind them.
-- Glass tab bar, header, composer, search field, cards and circular buttons.
-- iOS geometry: 34/44 pt bars, 54 pt avatars, hairline separators, grouped
-  settings cards, bubble tails, tick marks and blue `#007AFF` accent.
-- Spring press-scale, animated tab/route transitions and bubble entrances.
+- `liquiglass` `GlassSurface` panels with the package's real fragment shader on
+  Impeller, plus an animated colour wallpaper behind them.
+- Glass everywhere it belongs: the chats header, conversation bar, tab bar,
+  composer, search field, cards, sheets and circular buttons. See
+  [Liquid glass](#liquid-glass) for what the material actually does.
+- iOS geometry: 34 pt large titles that collapse into a centred nav-bar title,
+  54 pt chat avatars, 18 pt bubbles with tails, hairline separators, grouped
+  settings cards, tick marks and the blue `#007AFF` accent.
+- A tab bar whose selection is a lens that slides between slots, a capsule
+  composer that grows to five lines, scroll-to-latest, pull-to-refresh,
+  spring press-scale and Hero avatars between the list and the chat.
 - Light, dark and system appearance, persisted with `shared_preferences`.
 
 ## What is not implemented
@@ -69,13 +90,18 @@ Requirements: Flutter 3.50.1 (Dart 3.14), JDK 17 and the Android SDK 36.
 flutter pub get
 flutter analyze
 flutter build apk --debug
-flutter build apk --release
-# build/app/outputs/flutter-apk/app-debug.apk
-# build/app/outputs/flutter-apk/app-release.apk
+
+# universal stable (both ARM ABIs, R8-shrunk)
+flutter build apk --release --target-platform android-arm,android-arm64
+
+# per-ABI stable APKs (the small ones)
+flutter build apk --release --split-per-abi \
+  --target-platform android-arm,android-arm64
 ```
 
-The GitHub workflow builds both APKs, uploads them as artifacts and publishes
-them to the `courier-latest` release on every push to `main`.
+The GitHub workflow builds the debug APK, the universal stable APK and both
+per-ABI stable APKs, uploads them as artifacts and publishes them to the
+`courier-latest` release on every push to `main`.
 
 ### Signing
 
@@ -96,6 +122,43 @@ flutter build apk --release \
   --dart-define=COURIER_API_ID=1234567 \
   --dart-define=COURIER_API_HASH=0123456789abcdef0123456789abcdef
 ```
+
+## Liquid glass
+
+The material is [`shayann07/liquidglass`](https://github.com/shayann07/liquidglass)'s
+production fragment shader over the live backdrop, wrapped by `GlassPanel` in
+`lib/ui/components/glass.dart`, which adds what iOS does around the shader:
+
+- **Light from straight overhead.** The package defaults to a top-left light;
+  Courier passes `Offset(0, -1)`, the direction iOS 27 measures.
+- **Materialisation, not fading.** A panel grows its `materialize` value from 0
+  to 1 on first build, so glass condenses into place.
+- **A real contour.** A 0.7 pt gradient rim (bright top-left, cool bottom) is
+  painted on the edge instead of a flat 1 px border, plus a diagonal sheen that
+  sits between the glass and its content.
+- **Accessibility.** Increase Contrast is passed to the shader as
+  `increasedContrast`; Reduce Motion and accessible navigation turn off
+  materialisation, press springs and the wallpaper drift.
+- **A bounded wallpaper.** `LiquidWallpaper` drives `CustomPaint` through a
+  `ValueNotifier` and steps its phase coarsely (about 15 Hz on a 64 s cycle),
+  so the background never rebuilds widgets and never repaints needlessly.
+
+On Android 13+ this is the real AGSL refraction; below 13 the package falls back
+to a tinted, rim-lit blur, which the same widgets pick up automatically.
+
+## Telegram-iOS surface
+
+Recreated from the Telegram-iOS client's structure (SwiftUI/UIKit in
+[TelegramMessenger/Telegram-iOS](https://github.com/TelegramMessenger/Telegram-iOS)),
+not copied from it:
+
+| Surface | Courier |
+| --- | --- |
+| Chats | 34 pt title that collapses into a centred nav-bar title; pinned glass search field; pinned/muted markers; blue unread pills |
+| Conversation | Centred avatar + name + presence in the glass bar; bubbles with tails, ticks, day and unread dividers; scroll-to-latest |
+| Composer | Glass capsule input inside a glass bar, attachment/emoji, send that becomes a mic when empty |
+| Tabs | Floating glass bar, sliding selection lens, unread badge, semantics for TalkBack |
+| Settings | Grouped glass cards, 29 pt coloured icons, hairline separators, iOS switches and segmented controls |
 
 ## Architecture in one paragraph
 

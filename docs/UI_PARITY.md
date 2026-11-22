@@ -21,23 +21,36 @@ with TDLib.
 ## Liquid glass
 
 `liquiglass` supplies `GlassSurface`, which renders the package's fragment
-shader for refraction and a specular rim. Courier wraps it in:
+shader for refraction. `GlassPanel` (`lib/ui/components/glass.dart`) wraps it
+with the material behaviour iOS adds around the shader:
 
-- `GlassBar` for the tab bar, chat header and composer backdrop.
-- `GlassCard` for grouped surfaces that need a lighter tint.
-- `GlassField` for search and message inputs.
-- `GlassCircleButton` for compose and back controls.
-- `LiquidWallpaper` for the slowly drifting colour field behind the interface.
+- light from straight overhead (`Offset(0, -1)`), the iOS 27 measurement;
+- materialisation from 0 to 1 instead of a fade-in;
+- a 0.7 pt gradient contour — bright top-left, cool bottom — instead of a flat
+  1 px border, plus a diagonal sheen between the glass and its content;
+- Increase Contrast forwarded as the shader's `increasedContrast`;
+- Reduce Motion skips materialisation, press springs and wallpaper drift.
 
-On devices where the shader cannot run, `liquiglass` degrades to a translucent
-surface; the app still lays out correctly.
+Surfaces built on it: `GlassBar` (tab bar, conversation bar, composer),
+`GlassCard` (grouped settings, sheets), `GlassField` (search and message
+inputs), `GlassCircleButton` (compose, back, info, scroll-to-latest) and
+`LiquidWallpaper`.
+
+On devices where the shader cannot run (or below Android 13), `liquiglass`
+degrades to a frosted, rim-lit surface; the same widgets pick it up and the app
+still lays out correctly.
 
 ## Motion
 
 - Press-scale springs on rows, tabs and buttons (`pressable.dart`).
-- Tab switches and route pushes use fade/scale/slide transitions.
-- Message bubbles enter with a short offset/fade.
-- The wallpaper drifts continuously without rebuilds.
+- The tab selection is a lens that slides between slots over 260 ms instead of a
+  per-tab tint fading in place.
+- The 34 pt Chats title collapses into a centred nav-bar title as the list
+  scrolls under the glass header.
+- Scroll-to-latest fades in when the conversation leaves the bottom.
+- Route pushes use the Cupertino slide; avatars use Hero between list and chat.
+- The wallpaper drifts continuously without rebuilding widgets and stops under
+  Reduce Motion.
 
 ## Deliberate differences
 
