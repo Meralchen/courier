@@ -25,12 +25,14 @@ and attaches them to the
 - `SHA256SUMS.txt` — checksums for all four. A rebuild replaces the APKs and the
   sums together, so read this file rather than a checksum copied into a document.
 
-Measured on the published files (commit `80853df`): **arm64 41,668,272 B
+Measured on the published files (commit `44cacb0`): **arm64 41,733,872 B
 (41.7 MB)**, arm 32.98 MB, universal 98.5 MB, debug ~229 MB.
 Downloaded the published arm64 APK and matched its SHA-256
-(`10360731…48a4`) against `SHA256SUMS.txt`, confirmed `Unviewed story` is
-compiled into `libapp.so`, and found `GetChatActiveStories`,
-`UpdateChatActiveStories` and `TelegramStoriesKt` in `classes.dex`. The first universal build was
+(`ccf58f96…9e07`) against `SHA256SUMS.txt`; `libapp.so` contains `Stickers`,
+`Emoji` and the panel's empty-state sentence, and `classes.dex` contains
+`InputMessageSticker`, `GetInstalledStickerSets` and `sendSticker`. The earlier
+`80853df` APK was verified the same way for story circles (`Unviewed story`,
+`GetChatActiveStories` in `classes.dex`). The first universal build was
 120 MB because it packed three TDLib binaries (`arm64-v8a`, `armeabi-v7a`,
 `x86_64`) and unshrunk dex. R8 cut `classes.dex` from 9.7 MB to 2.8 MB, and the
 per-ABI splits leave exactly one `libtdjni.so` in each stable APK. Downloaded
@@ -38,6 +40,20 @@ the published arm64 APK and matched its SHA-256 against `SHA256SUMS.txt`;
 `aapt2` reports package `com.courier.messenger`, targetSdk 36, native-code
 `arm64-v8a`, and `assets/flutter_assets/packages/liquiglass/shaders/liquid_glass.frag`
 is present.
+
+### What changed in this build
+
+- Chats follows the current iOS bar: Edit pill, centred title, compose, search,
+  filter chips with counts, and real multi-select delete. The floating compose
+  button, section headers and footer counter are gone, so nothing overlaps a row.
+- Contacts has the Sort pill and last-seen ordering with online/last-seen
+  subtitles.
+- The tab bar has the trailing search accessory and opens a working local search.
+- The composer's emoji button opens the sticker keyboard: recent stickers, the
+  first installed regular sets with thumbnails, and an emoji grid that types
+  into the draft. Sending uses `InputMessageSticker`, which replaced
+  `SendSticker` in this TDLib.
+- Settings gains Saved Messages through `CreatePrivateChat` on the own user id.
 
 ### Signing and shrinking
 
