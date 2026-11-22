@@ -43,8 +43,17 @@ still lays out correctly.
 ## Motion
 
 - Press-scale springs on rows, tabs and buttons (`pressable.dart`).
-- The tab selection is a lens that slides between slots over 260 ms instead of a
-  per-tab tint fading in place.
+- The tab bar is modelled on the liquidglass `held-drag` reference: touch-down
+  swells the inset pill into a lens that stands 4 pt proud of the bar on each
+  side and is 16 pt wider than a slot; the bar lifts to 1.05 and the tab under
+  the lens grows to 1.18 and turns accent. Dragging follows the finger (keeping
+  the grab offset up to half the lens width), ticks a selection haptic for each
+  tab it crosses, previews that tab, and commits once on release. A release
+  faster than 550 px/s throws it to the next tab; otherwise it settles on the
+  nearest. Reduce Motion removes the lens, the stretch and the throw while taps
+  and drags still select. The library's Flutter port ships only `GlassSurface`,
+  so this interaction is implemented in `lib/ui/tab_bar.dart` against the
+  Compose tab bar's published geometry.
 - The 34 pt Chats title collapses into a centred nav-bar title as the list
   scrolls under the glass header.
 - Scroll-to-latest fades in when the conversation leaves the bottom.

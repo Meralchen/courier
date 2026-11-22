@@ -69,9 +69,11 @@ smaller than the old build because of R8.
 - iOS geometry: 34 pt large titles that collapse into a centred nav-bar title,
   54 pt chat avatars, 18 pt bubbles with tails, hairline separators, grouped
   settings cards, tick marks and the blue `#007AFF` accent.
-- A tab bar whose selection is a lens that slides between slots, a capsule
-  composer that grows to five lines, scroll-to-latest, pull-to-refresh,
-  spring press-scale and Hero avatars between the list and the chat.
+- A tab bar whose selection is a **lens you can hold, drag and throw**: touch
+  swells the inset pill into a squircle proud of the bar, the tab under it grows
+  and turns blue, dragging follows your finger with a selection tick per tab, and
+  a flick carries it to the next tab. Plus a capsule composer that grows to five
+  lines, scroll-to-latest, pull-to-refresh, spring press-scale and Hero avatars.
 - Light, dark and system appearance, persisted with `shared_preferences`.
 
 ## What is not implemented
@@ -158,7 +160,7 @@ not copied from it:
 | Chats | 34 pt title that collapses into a centred nav-bar title; pinned glass search field; pinned/muted markers; blue unread pills |
 | Conversation | Centred avatar + name + presence in the glass bar; bubbles with tails, ticks, day and unread dividers; scroll-to-latest |
 | Composer | Glass capsule input inside a glass bar, attachment/emoji, send that becomes a mic when empty |
-| Tabs | Floating glass bar, sliding selection lens, unread badge, semantics for TalkBack |
+| Tabs | Floating glass bar; hold to swell the pill into a lens 4 pt proud of the bar and 16 pt wider than a slot, the tab under it grows to 1.18 and turns accent, drag follows the finger with a haptic per tab, flick throws it, release settles; unread badge and TalkBack actions |
 | Settings | Grouped glass cards, 29 pt coloured icons, hairline separators, iOS switches and segmented controls |
 
 ## Architecture in one paragraph
