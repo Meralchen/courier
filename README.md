@@ -92,6 +92,7 @@ Requirements: Flutter 3.50.1 (Dart 3.14), JDK 17 and the Android SDK 36.
 ```bash
 flutter pub get
 flutter analyze
+flutter test
 flutter build apk --debug
 
 # universal stable (both ARM ABIs, R8-shrunk)
