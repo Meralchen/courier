@@ -527,16 +527,29 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           await store.editMessage(widget.chatId, message.id, edited);
         }
       case 'delete':
-        final bool confirmed = await showGlassConfirm(
+        final String? scope = await showActionSheet<String>(
           context,
           title: 'Delete message?',
-          message: 'It will be deleted for everyone in this chat.',
-          confirmLabel: 'Delete',
-          destructive: true,
+          actions: <SheetAction<String>>[
+            if (message.outgoing)
+              const SheetAction<String>(
+                label: 'Delete for everyone',
+                icon: Icons.delete_forever_outlined,
+                value: 'all',
+                destructive: true,
+              ),
+            const SheetAction<String>(
+              label: 'Delete for me',
+              icon: Icons.delete_outline,
+              value: 'me',
+              destructive: true,
+            ),
+          ],
         );
-        if (confirmed) {
-          await store.deleteMessages(widget.chatId, <int>[message.id]);
-        }
+        if (scope == null) return;
+        await store.deleteMessages(widget.chatId, <int>[
+          message.id,
+        ], revoke: scope == 'all');
     }
   }
 

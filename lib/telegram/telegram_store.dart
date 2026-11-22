@@ -470,10 +470,15 @@ class TelegramStore extends ChangeNotifier {
     }),
   );
 
-  Future<void> deleteMessages(int chatId, List<int> ids) => _guard(
+  Future<void> deleteMessages(
+    int chatId,
+    List<int> ids, {
+    bool revoke = true,
+  }) => _guard(
     () => _client.call('deleteMessages', <String, Object?>{
       'chatId': chatId,
       'messageIds': ids,
+      'revoke': revoke,
     }),
   );
 

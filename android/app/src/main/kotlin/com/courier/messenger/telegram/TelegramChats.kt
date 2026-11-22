@@ -326,13 +326,14 @@ internal fun TelegramEngine.editMessage(
 internal fun TelegramEngine.deleteMessages(
     chatId: Long,
     ids: List<Long>,
+    revoke: Boolean,
     result: MethodChannel.Result,
 ) {
     if (ids.isEmpty()) {
         result.success(null)
         return
     }
-    client?.send(TdApi.DeleteMessages(chatId, ids.toLongArray(), true)) { reply ->
+    client?.send(TdApi.DeleteMessages(chatId, ids.toLongArray(), revoke)) { reply ->
         main.post {
             if (reply is TdApi.Error) {
                 emitError(reply.message)

@@ -120,7 +120,12 @@ internal fun TelegramEngine.handle(
             string("text"),
             result,
         )
-        "deleteMessages" -> deleteMessages(long("chatId"), ids("messageIds"), result)
+        "deleteMessages" -> deleteMessages(
+            long("chatId"),
+            ids("messageIds"),
+            args["revoke"] as? Boolean ?: true,
+            result,
+        )
         "pin" -> pinMessage(
             long("chatId"),
             long("messageId"),
