@@ -125,10 +125,9 @@ class _SearchScreenState extends State<SearchScreen> {
       merged.putIfAbsent(chat.id, () => chat);
     }
     final List<ChatSummary> chats = merged.values.toList();
-    final List<ChatSummary> global =
-        (_results?.global ?? const <ChatSummary>[])
-            .where((ChatSummary chat) => !merged.containsKey(chat.id))
-            .toList();
+    final List<ChatSummary> global = (_results?.global ?? const <ChatSummary>[])
+        .where((ChatSummary chat) => !merged.containsKey(chat.id))
+        .toList();
     final List<SearchMessageHit> messages = clean.isEmpty
         ? const <SearchMessageHit>[]
         : _results?.messages ?? const <SearchMessageHit>[];
@@ -229,7 +228,8 @@ class _SearchScreenState extends State<SearchScreen> {
                   ? EmptyState(
                       icon: Icons.search_off,
                       title: 'No results',
-                      message: 'Nothing in your chats or on Telegram matches '
+                      message:
+                          'Nothing in your chats or on Telegram matches '
                           '“$clean”.',
                     )
                   : ListView(
@@ -269,7 +269,8 @@ class _SearchScreenState extends State<SearchScreen> {
       return const EmptyState(
         icon: Icons.search,
         title: 'Search',
-        message: 'Find people, groups, channels and messages from all of '
+        message:
+            'Find people, groups, channels and messages from all of '
             'Telegram.',
       );
     }

@@ -313,6 +313,8 @@ class Message {
     required this.kind,
     required this.photoFileId,
     required this.photoPath,
+    required this.mediaFileId,
+    required this.mediaPath,
     required this.width,
     required this.height,
     required this.fileName,
@@ -342,6 +344,8 @@ class Message {
     kind: asString(m['kind'], 'text'),
     photoFileId: asInt(m['photoFileId']),
     photoPath: asString(m['photoPath']),
+    mediaFileId: asInt(m['mediaFileId']),
+    mediaPath: asString(m['mediaPath']),
     width: asInt(m['width']),
     height: asInt(m['height']),
     fileName: asString(m['fileName']),
@@ -372,6 +376,10 @@ class Message {
   final String kind;
   final int photoFileId;
   final String photoPath;
+
+  /// The full attachment (video/document/audio) rather than its thumbnail.
+  final int mediaFileId;
+  final String mediaPath;
   final int width;
   final int height;
   final String fileName;
@@ -405,6 +413,8 @@ class Message {
     kind: kind,
     photoFileId: photoFileId,
     photoPath: photoPath,
+    mediaFileId: mediaFileId,
+    mediaPath: mediaPath,
     width: width,
     height: height,
     fileName: fileName,
@@ -469,8 +479,7 @@ class SearchResults {
   final List<ChatSummary> global;
   final List<SearchMessageHit> messages;
 
-  bool get isEmpty =>
-      chats.isEmpty && global.isEmpty && messages.isEmpty;
+  bool get isEmpty => chats.isEmpty && global.isEmpty && messages.isEmpty;
 }
 
 class Profile {

@@ -15,6 +15,7 @@ class MessageBubble extends StatelessWidget {
     required this.isLast,
     required this.onLongPress,
     required this.onPhotoTap,
+    this.onFileTap,
     this.onReactionTap,
   });
 
@@ -24,6 +25,10 @@ class MessageBubble extends StatelessWidget {
   final bool isLast;
   final VoidCallback onLongPress;
   final VoidCallback onPhotoTap;
+
+  /// Tapping a video, document or audio message downloads it (if needed) and
+  /// hands it to the system app for that file type.
+  final VoidCallback? onFileTap;
 
   /// Tap on an existing reaction chip; TDLib toggles the account's reaction.
   final ValueChanged<String>? onReactionTap;
@@ -181,6 +186,7 @@ class MessageBubble extends StatelessWidget {
                                 message: message,
                                 outgoing: outgoing,
                                 onPhotoTap: onPhotoTap,
+                                onFileTap: onFileTap,
                               ),
                             ),
                           if (message.text.isNotEmpty &&

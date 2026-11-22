@@ -1,13 +1,19 @@
 package com.courier.messenger
 
 import android.Manifest
+import android.app.Activity
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.OpenableColumns
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import com.courier.messenger.telegram.CourierTelegramPlugin
+import java.io.File
+import java.io.FileOutputStream
 
 /**
  * Single Flutter activity. The Telegram engine lives in a Flutter plugin so it
@@ -17,7 +23,9 @@ import com.courier.messenger.telegram.CourierTelegramPlugin
  */
 class MainActivity : FlutterActivity() {
     private var recorder: VoiceRecorder? = null
+    private var player: VoicePlayer? = null
     private var pendingStart: MethodChannel.Result? = null
+    private var pendingFile: MethodChannel.Result? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -41,6 +49,8 @@ class MainActivity : FlutterActivity() {
 
         val voice = VoiceRecorder(this)
         recorder = voice
+        val playback = VoicePlayer()
+        player = playback
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             VOICE_CHANNEL,
@@ -64,10 +74,100 @@ class MainActivity : FlutterActivity() {
                     voice.cancel()
                     result.success(null)
                 }
+                "play" -> {
+                    voice.cancel()
+                    val path = call.argument<String>("path") ?: ""
+                    if (path.isNotEmpty() && playback.play(path)) {
+                        result.success(null)
+                    } else {
+                        result.error("voice", "Could not play the recording", null)
+                    }
+                }
+                "stopPlayback" -> {
+                    playback.stop()
+                    result.success(null)
+                }
+                else -> result.notImplemented()
+            }
+        }
+
+        // Documents come from Android's own file picker so the app does not
+        // carry a picker plugin; the chosen file is copied into our cache so
+        // TDLib can read a stable local path.
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            FILE_CHANNEL,
+        ).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "pick" -> pickFile(result)
                 else -> result.notImplemented()
             }
         }
     }
+
+    private fun pickFile(result: MethodChannel.Result) {
+        if (pendingFile != null) {
+            result.error("file", "Another file picker is already open", null)
+            return
+        }
+        pendingFile = result
+        try {
+            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                addCategory(Intent.CATEGORY_OPENABLE)
+                type = "*/*"
+            }
+            startActivityForResult(intent, FILE_REQUEST)
+        } catch (t: Throwable) {
+            pendingFile = null
+            result.error("file", "No file picker is available", null)
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != FILE_REQUEST) return
+        val pending = pendingFile ?: return
+        pendingFile = null
+        val uri = data?.data
+        if (resultCode != Activity.RESULT_OK || uri == null) {
+            pending.success(null)
+            return
+        }
+        try {
+            val name = (displayName(uri) ?: "file").replace('/', '_')
+            // One directory per pick keeps the original file name, which is
+            // what TDLib shows as the document name in the conversation.
+            val dir = File(File(cacheDir, "attachments"), "${System.currentTimeMillis()}")
+                .apply { mkdirs() }
+            val target = File(dir, name)
+            contentResolver.openInputStream(uri).use { input ->
+                if (input == null) {
+                    throw IllegalStateException("Could not read the file")
+                }
+                FileOutputStream(target).use { output -> input.copyTo(output) }
+            }
+            pending.success(
+                mapOf(
+                    "path" to target.absolutePath,
+                    "name" to name,
+                    "size" to target.length(),
+                ),
+            )
+        } catch (t: Throwable) {
+            pending.error("file", t.message ?: "Could not read the file", null)
+        }
+    }
+
+    private fun displayName(uri: Uri): String? =
+        contentResolver.query(
+            uri,
+            arrayOf(OpenableColumns.DISPLAY_NAME),
+            null,
+            null,
+            null,
+        )?.use { cursor ->
+            if (cursor.moveToFirst()) cursor.getString(0) else null
+        }
 
     private fun startVoice(voice: VoiceRecorder, result: MethodChannel.Result) {
         if (voice.hasPermission()) {
@@ -110,8 +210,16 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    override fun onDestroy() {
+        player?.stop()
+        recorder?.cancel()
+        super.onDestroy()
+    }
+
     companion object {
         const val VOICE_CHANNEL = "courier/voice"
+        const val FILE_CHANNEL = "courier/files"
         private const val NOTIFICATIONS_REQUEST = 7402
+        private const val FILE_REQUEST = 7403
     }
 }

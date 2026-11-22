@@ -70,4 +70,25 @@ class VoiceRecorder {
       // Cancelling is best effort; a failed stop already discarded the file.
     }
   }
+
+  /// Plays a downloaded voice note or audio file through the native player.
+  static Future<void> play(String path) async {
+    try {
+      await _channel.invokeMethod<void>('play', <String, Object?>{
+        'path': path,
+      });
+    } on PlatformException catch (error) {
+      throw VoiceException(error.message ?? 'Could not play the recording');
+    } on MissingPluginException {
+      throw VoiceException('Playback is unavailable on this device');
+    }
+  }
+
+  static Future<void> stopPlayback() async {
+    try {
+      await _channel.invokeMethod<void>('stopPlayback');
+    } catch (_) {
+      // Stopping a player that already finished is not an error.
+    }
+  }
 }

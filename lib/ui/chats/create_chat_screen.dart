@@ -49,9 +49,9 @@ class _CreateChatScreenState extends State<CreateChatScreen> {
     } catch (error) {
       if (!mounted) return;
       setState(() => _busy = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.toString())),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.toString())));
     }
   }
 
@@ -166,7 +166,8 @@ class _CreateChatScreenState extends State<CreateChatScreen> {
                         ? const EmptyState(
                             icon: Icons.person_add_alt_1_outlined,
                             title: 'No contacts yet',
-                            message: 'Start a chat with someone first, then '
+                            message:
+                                'Start a chat with someone first, then '
                                 'they appear here to add to a group.',
                           )
                         : ListView.separated(

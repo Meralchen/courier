@@ -15,9 +15,9 @@ class Composer extends StatefulWidget {
     required this.replyTo,
     required this.onCancelReply,
     required this.onSend,
-    required this.onPickPhoto,
+    required this.onAttach,
     required this.onTyping,
-    this.sendingPhoto = false,
+    this.sendingAttachment = false,
     this.onOpenStickers,
     this.onVoiceStart,
     this.onVoiceFinish,
@@ -27,9 +27,9 @@ class Composer extends StatefulWidget {
   final Message? replyTo;
   final VoidCallback onCancelReply;
   final ValueChanged<String> onSend;
-  final VoidCallback onPickPhoto;
+  final VoidCallback onAttach;
   final ValueChanged<bool> onTyping;
-  final bool sendingPhoto;
+  final bool sendingAttachment;
 
   /// Opens the sticker keyboard. Falls back to the built-in emoji sheet when a
   /// caller does not provide one.
@@ -393,8 +393,8 @@ class _ComposerState extends State<Composer> {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: <Widget>[
                 IconButton(
-                  onPressed: widget.sendingPhoto ? null : widget.onPickPhoto,
-                  icon: widget.sendingPhoto
+                  onPressed: widget.sendingAttachment ? null : widget.onAttach,
+                  icon: widget.sendingAttachment
                       ? SizedBox(
                           width: 18,
                           height: 18,

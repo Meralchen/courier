@@ -396,6 +396,38 @@ class TelegramStore extends ChangeNotifier {
     }),
   );
 
+  Future<void> sendVideo(
+    int chatId,
+    String path, {
+    String caption = '',
+    int? replyToId,
+  }) => _guard(
+    () => _client.call('sendVideo', <String, Object?>{
+      'chatId': chatId,
+      'path': path,
+      'caption': caption,
+      'replyToId': replyToId ?? 0,
+    }),
+  );
+
+  Future<void> sendDocument(
+    int chatId,
+    String path, {
+    String caption = '',
+    int? replyToId,
+  }) => _guard(
+    () => _client.call('sendDocument', <String, Object?>{
+      'chatId': chatId,
+      'path': path,
+      'caption': caption,
+      'replyToId': replyToId ?? 0,
+    }),
+  );
+
+  /// Opens a downloaded attachment with the app registered for its type.
+  Future<void> openFile(String path) =>
+      _guard(() => _client.call('openFile', <String, Object?>{'path': path}));
+
   Future<void> sendVoice(
     int chatId,
     String path,
@@ -514,9 +546,10 @@ class TelegramStore extends ChangeNotifier {
   /// Errors are returned to the caller so the search screen can show them
   /// inline while keeping whatever it already had on screen.
   Future<SearchResults> search(String query) async {
-    final Object? raw = await _client.invoke<Object?>('search', <String, Object?>{
-      'query': query,
-    });
+    final Object? raw = await _client.invoke<Object?>(
+      'search',
+      <String, Object?>{'query': query},
+    );
     return SearchResults.fromMap(asMap(raw));
   }
 

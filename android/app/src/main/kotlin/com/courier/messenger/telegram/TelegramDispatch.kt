@@ -81,6 +81,21 @@ internal fun TelegramEngine.handle(
             long("replyToId"),
             result,
         )
+        "sendVideo" -> sendVideo(
+            long("chatId"),
+            string("path"),
+            string("caption"),
+            long("replyToId"),
+            result,
+        )
+        "sendDocument" -> sendDocument(
+            long("chatId"),
+            string("path"),
+            string("caption"),
+            long("replyToId"),
+            result,
+        )
+        "openFile" -> openLocalFile(string("path"), result)
         "sendVoice" -> sendVoice(
             long("chatId"),
             string("path"),

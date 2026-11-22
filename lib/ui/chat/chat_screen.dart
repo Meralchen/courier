@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:material_ui/material_ui.dart';
@@ -10,6 +11,7 @@ import '../../core/theme.dart';
 import '../../core/wallpaper.dart';
 import '../../state/app_settings.dart';
 import '../../state/scopes.dart';
+import '../../telegram/file_picker_channel.dart';
 import '../../telegram/models.dart';
 import '../../telegram/telegram_store.dart';
 import '../../telegram/voice_recorder.dart';
@@ -41,7 +43,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   Message? _reply;
   bool _nearBottom = true;
   bool _loadingMore = false;
-  bool _sendingPhoto = false;
+  bool _sendingAttachment = false;
   bool _unreadCaptured = false;
   int? _unreadMarker;
   int _lastCount = 0;
@@ -149,22 +151,143 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         imageQuality: 88,
       );
       if (picked == null || !mounted) return;
-      setState(() => _sendingPhoto = true);
+      setState(() => _sendingAttachment = true);
       await TelegramScope.read(
         context,
       ).sendPhoto(widget.chatId, picked.path, replyToId: _reply?.id);
       if (!mounted) return;
       setState(() {
-        _sendingPhoto = false;
+        _sendingAttachment = false;
         _reply = null;
       });
       _scheduleJump(animate: true);
     } catch (error) {
       if (!mounted) return;
-      setState(() => _sendingPhoto = false);
+      setState(() => _sendingAttachment = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Could not open the photo: $error')),
       );
+    }
+  }
+
+  void _notice(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  /// iOS opens an attachment menu from the paperclip; each entry picks a
+  /// different source and sends the matching Telegram media type.
+  Future<void> _attachments() async {
+    final String? choice = await showActionSheet<String>(
+      context,
+      title: 'Attach',
+      actions: const <SheetAction<String>>[
+        SheetAction<String>(
+          label: 'Photo',
+          icon: Icons.photo_outlined,
+          value: 'photo',
+        ),
+        SheetAction<String>(
+          label: 'Video',
+          icon: Icons.videocam_outlined,
+          value: 'video',
+        ),
+        SheetAction<String>(
+          label: 'File',
+          icon: Icons.insert_drive_file_outlined,
+          value: 'file',
+        ),
+      ],
+    );
+    if (!mounted || choice == null) return;
+    switch (choice) {
+      case 'photo':
+        await _pickPhoto();
+        break;
+      case 'video':
+        await _pickVideo();
+        break;
+      case 'file':
+        await _pickFile();
+        break;
+    }
+  }
+
+  Future<void> _pickVideo() async {
+    try {
+      final XFile? picked = await ImagePicker().pickVideo(
+        source: ImageSource.gallery,
+      );
+      if (picked == null || !mounted) return;
+      setState(() => _sendingAttachment = true);
+      await TelegramScope.read(
+        context,
+      ).sendVideo(widget.chatId, picked.path, replyToId: _reply?.id);
+      if (!mounted) return;
+      setState(() {
+        _sendingAttachment = false;
+        _reply = null;
+      });
+      _scheduleJump(animate: true);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _sendingAttachment = false);
+      _notice('Could not attach the video: $error');
+    }
+  }
+
+  Future<void> _pickFile() async {
+    try {
+      final PickedDocument? picked = await FilePickerChannel.pick();
+      if (picked == null || !mounted) return;
+      setState(() => _sendingAttachment = true);
+      await TelegramScope.read(
+        context,
+      ).sendDocument(widget.chatId, picked.path, replyToId: _reply?.id);
+      if (!mounted) return;
+      setState(() {
+        _sendingAttachment = false;
+        _reply = null;
+      });
+      _scheduleJump(animate: true);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _sendingAttachment = false);
+      _notice('Could not attach the file: $error');
+    }
+  }
+
+  /// Downloads an attachment on demand and opens it with the system viewer.
+  Future<void> _openAttachment(Message message) async {
+    final TelegramStore store = TelegramScope.read(context);
+    String path = store.pathFor(message.mediaFileId, message.mediaPath);
+    if (path.isEmpty) {
+      if (message.mediaFileId == 0) {
+        _notice('This attachment is not available.');
+        return;
+      }
+      await store.ensureFile(message.mediaFileId);
+      for (int attempt = 0; attempt < 100; attempt++) {
+        path = store.pathFor(message.mediaFileId, message.mediaPath);
+        if (path.isNotEmpty) break;
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+      }
+    }
+    if (!mounted) return;
+    if (path.isEmpty) {
+      _notice('The file is still downloading.');
+      return;
+    }
+    if (!File(path).existsSync()) {
+      _notice('The file is no longer on this device.');
+      return;
+    }
+    try {
+      await store.openFile(path);
+    } catch (error) {
+      if (mounted) _notice('No app can open this file.');
     }
   }
 
@@ -397,6 +520,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           onLongPress: () => _actions(message),
           onPhotoTap: () =>
               openPhoto(context, path: imagePath, caption: message.text),
+          onFileTap: () => _openAttachment(message),
           onReactionTap: (String emoji) =>
               store.toggleReaction(widget.chatId, message.id, emoji),
         ),
@@ -497,10 +621,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               Composer(
                 controller: _draft,
                 replyTo: _reply,
-                sendingPhoto: _sendingPhoto,
+                sendingAttachment: _sendingAttachment,
                 onCancelReply: () => setState(() => _reply = null),
                 onSend: _send,
-                onPickPhoto: _pickPhoto,
+                onAttach: _attachments,
                 onTyping: (bool typing) =>
                     store.sendTyping(widget.chatId, typing),
                 onOpenStickers: _openStickers,

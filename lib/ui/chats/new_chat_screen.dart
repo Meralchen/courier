@@ -59,11 +59,7 @@ class _CreateRow extends StatelessWidget {
                 ),
               ),
             ),
-            Icon(
-              Icons.chevron_right,
-              size: 19,
-              color: colors.textTertiary,
-            ),
+            Icon(Icons.chevron_right, size: 19, color: colors.textTertiary),
           ],
         ),
       ),
@@ -95,7 +91,9 @@ class _NewChatScreenState extends State<NewChatScreen> {
     final String username = _value.trim();
     if (username.isEmpty || _opening) return;
     setState(() => _opening = true);
-    final int? chatId = await TelegramScope.read(context).openUsername(username);
+    final int? chatId = await TelegramScope.read(
+      context,
+    ).openUsername(username);
     if (!mounted) return;
     setState(() => _opening = false);
     if (chatId != null) Navigator.of(context).pop(chatId);
@@ -107,8 +105,10 @@ class _NewChatScreenState extends State<NewChatScreen> {
     final TelegramStore store = TelegramScope.of(context);
     final String needle = _value.trim().toLowerCase();
     final List<ChatSummary> contacts = store.contacts
-        .where((ChatSummary chat) =>
-            needle.isEmpty || chat.title.toLowerCase().contains(needle))
+        .where(
+          (ChatSummary chat) =>
+              needle.isEmpty || chat.title.toLowerCase().contains(needle),
+        )
         .toList();
 
     return Scaffold(
@@ -116,7 +116,10 @@ class _NewChatScreenState extends State<NewChatScreen> {
       body: Stack(
         children: <Widget>[
           Positioned.fill(
-            child: LiquidWallpaper(base: colors.chatBackdrop, dark: colors.dark),
+            child: LiquidWallpaper(
+              base: colors.chatBackdrop,
+              dark: colors.dark,
+            ),
           ),
           SafeArea(
             child: Column(
@@ -191,7 +194,9 @@ class _NewChatScreenState extends State<NewChatScreen> {
                               const SizedBox(
                                 width: 18,
                                 height: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
                               )
                             else
                               Icon(Icons.alternate_email, color: colors.accent),
@@ -234,7 +239,8 @@ class _NewChatScreenState extends State<NewChatScreen> {
                       ? EmptyState(
                           icon: Icons.person_search_outlined,
                           title: 'No people yet',
-                          message: 'Type a @username above to start a '
+                          message:
+                              'Type a @username above to start a '
                               'conversation with anyone on Telegram. Your recent '
                               'chats appear here too.',
                         )
@@ -248,8 +254,12 @@ class _NewChatScreenState extends State<NewChatScreen> {
                             return Pressable(
                               onTap: () => Navigator.of(context).pop(chat.id),
                               child: Padding(
-                                padding:
-                                    const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                                padding: const EdgeInsets.fromLTRB(
+                                  16,
+                                  8,
+                                  16,
+                                  8,
+                                ),
                                 child: Row(
                                   children: <Widget>[
                                     Avatar(

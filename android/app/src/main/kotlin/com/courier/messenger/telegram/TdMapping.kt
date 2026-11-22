@@ -56,6 +56,10 @@ internal fun TelegramEngine.messageMap(
     val content = message.content
     var text = TdFormat.contentText(content)
     var file: TdApi.File? = null
+    // The full attachment (video, document, audio, voice) as opposed to the
+    // small thumbnail used for the bubble. Downloading and opening a media
+    // message must use this file, not its preview.
+    var mediaFile: TdApi.File? = null
     var width = 0
     var height = 0
     var fileName = ""
@@ -66,12 +70,14 @@ internal fun TelegramEngine.messageMap(
         is TdApi.MessagePhoto -> {
             val size = TdFormat.bestPhotoSize(content.photo)
             file = size?.photo
+            mediaFile = size?.photo
             width = size?.width ?: 0
             height = size?.height ?: 0
             text = content.caption.text
         }
         is TdApi.MessageVideo -> {
             file = content.video.thumbnail?.file ?: content.video.video
+            mediaFile = content.video.video
             width = content.video.width
             height = content.video.height
             duration = content.video.duration
@@ -80,6 +86,7 @@ internal fun TelegramEngine.messageMap(
         }
         is TdApi.MessageAnimation -> {
             file = content.animation.thumbnail?.file ?: content.animation.animation
+            mediaFile = content.animation.animation
             width = content.animation.width
             height = content.animation.height
             duration = content.animation.duration
@@ -88,27 +95,32 @@ internal fun TelegramEngine.messageMap(
         }
         is TdApi.MessageDocument -> {
             file = content.document.document
+            mediaFile = content.document.document
             fileName = content.document.fileName
             text = content.caption.text
         }
         is TdApi.MessageAudio -> {
             file = content.audio.audio
+            mediaFile = content.audio.audio
             fileName = content.audio.fileName
             duration = content.audio.duration
             text = content.caption.text
         }
         is TdApi.MessageVoiceNote -> {
             file = content.voiceNote.voice
+            mediaFile = content.voiceNote.voice
             duration = content.voiceNote.duration
         }
         is TdApi.MessageVideoNote -> {
             file = content.videoNote.video
+            mediaFile = content.videoNote.video
             width = content.videoNote.thumbnail?.width ?: 0
             height = content.videoNote.thumbnail?.height ?: 0
             duration = content.videoNote.duration
         }
         is TdApi.MessageSticker -> {
             file = content.sticker.sticker
+            mediaFile = content.sticker.sticker
             width = content.sticker.width
             height = content.sticker.height
         }
@@ -138,6 +150,8 @@ internal fun TelegramEngine.messageMap(
         "kind" to TdFormat.kind(content),
         "photoFileId" to (file?.id ?: 0),
         "photoPath" to TdFormat.localPath(file),
+        "mediaFileId" to (mediaFile?.id ?: 0),
+        "mediaPath" to TdFormat.localPath(mediaFile),
         "width" to width,
         "height" to height,
         "fileName" to fileName,
