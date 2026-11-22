@@ -1,5 +1,35 @@
 # Courier progress
 
+## Search, groups and media pass (2026-11-22)
+
+- **Global search.** The magnifier now asks TDLib: `SearchChats` for chats in
+  the account, `SearchPublicChats` for public channels and groups, and
+  `SearchMessages` across the main list. Results are grouped into Chats,
+  Messages and Global; local title/preview matches render immediately and the
+  server answer replaces them without flicker.
+- **Groups and channels.** The new-message sheet can create a supergroup or a
+  broadcast channel (`CreateNewSupergroupChat`) and add selected contacts with
+  `AddChatMembers`. Info pages load `GetSupergroupFullInfo` /
+  `GetBasicGroupFullInfo`, the real member count, description and member list,
+  and can rename, change the description, add members, open a member's private
+  chat (`CreatePrivateChat`) or leave (`LeaveChat`).
+- **Media attachments.** The paperclip opens an iOS-style menu for photo, video
+  and file. Videos send through `InputMessageVideo` with their real dimensions
+  and duration; documents go through Android's own `ACTION_OPEN_DOCUMENT`
+  picker and `InputMessageDocument`. Attachments download on demand and open in
+  the system viewer through a `FileProvider`.
+- **Voice playback.** Voice and audio messages play in place through a native
+  `MediaPlayer`, with a progress line and a single active player.
+- **Pinned messages.** `GetChatPinnedMessage` feeds the pinned bar under the
+  header; `PinChatMessage` / `UnpinChatMessage` back the message menu. Pinned
+  state refreshes when a chat opens, after pinning, and when the pinned
+  message is deleted.
+- **Notifications.** Incoming messages post an Android notification on a
+  dedicated channel, skip muted chats, the open chat and old history, and open
+  their chat when tapped. The Settings switches drive the native notifier.
+- **Drafts and deletes.** Composer drafts persist per chat, and deleting a
+  message offers "Delete for everyone" (revoke) or "Delete for me".
+
 ## iOS parity pass (2026-11-22)
 
 Everything below runs on real TDLib calls, not local stand-ins:
@@ -199,12 +229,17 @@ and the tap target.
 - [x] Logout and re-login.
 - [x] Sticker keyboard backed by TDLib: recent + installed sets with
   thumbnails, sending through `InputMessageSticker`, emoji grid that types.
-- [ ] Voice notes, video, GIF search.
-- [ ] Reactions, forwarding, polls, locations.
-- [ ] Global message search.
-- [ ] Groups/channels administration, folders, archive.
+- [x] Voice notes (record, send, play) and video/document attachments.
+- [~] GIFs: saved-GIF tab and sending; server-side GIF search is not built.
+- [x] Reactions and forwarding.
+- [ ] Polls, locations, contact sharing.
+- [x] Global chat, public-chat and message search.
+- [x] Archive, chat folders, group/channel creation and member management.
+- [x] Pinned messages with the iOS pinned bar.
+- [x] Android message notifications, switches and tap-through.
+- [x] Per-chat drafts and delete for me/everyone.
 - [ ] Secret chats.
-- [ ] VoIP calls.
+- [ ] VoIP calls (needs the separate tgcalls/WebRTC engine).
 
 ## Phase 3 — Interface
 
