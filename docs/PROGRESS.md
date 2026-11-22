@@ -15,6 +15,9 @@ verified end-to-end in this environment, `[ ]` not implemented.
 - [x] TDLib dependency (`io.github.tdlib-android:core:0.1.1`, JNI for 3 ABIs).
 - [x] `TdlibClient`: single `Client`, update stream → `StateFlow`s.
 - [x] `setTdlibParameters` with per-install TDLib database directory.
+- [x] Ships the OwpenGram application credentials as build-time defaults, so the
+      app goes straight to the phone screen; `COURIER_API_ID`/`COURIER_API_HASH`
+      (Gradle property, env or `local.properties`) override them.
 - [x] Auth state machine: `waitTdlibParameters` → `waitPhoneNumber` →
       `waitCode` → `waitPassword` → `ready`; error surfacing per step.
 - [~] Phone login: code path implemented (`setAuthenticationPhoneNumber`),
@@ -38,6 +41,9 @@ verified end-to-end in this environment, `[ ]` not implemented.
 - [ ] Reactions, replies, forwarding, editing, deletion from UI.
 - [ ] Chat management (new chat, join/leave, mute, archive, folders).
 - [ ] Secret chats.
+- [ ] Server selection (OwpenGram-style `host:port` + RSA key + DC id). Blocked:
+      TDLib only connects to Telegram's own DCs; this needs OwpenGram's patched
+      network stack instead of TDLib.
 
 ## Phase 3 — iOS interface
 
