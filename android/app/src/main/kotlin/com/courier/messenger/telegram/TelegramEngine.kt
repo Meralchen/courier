@@ -232,7 +232,7 @@ internal class TelegramEngine(internal val emit: (Map<String, Any?>) -> Unit) {
         publishChats()
     }
 
-    private fun addMessage(message: TdApi.Message) {
+    internal fun addMessage(message: TdApi.Message) {
         val list = messages.getOrPut(message.chatId) { mutableListOf() }
         if (list.none { it.id == message.id }) {
             list.add(message)
