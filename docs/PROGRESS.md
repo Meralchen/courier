@@ -25,10 +25,12 @@ and attaches them to the
 - `SHA256SUMS.txt` — checksums for all four. A rebuild replaces the APKs and the
   sums together, so read this file rather than a checksum copied into a document.
 
-Measured on the published files (run #17, commit `1ad7c32`): **arm64
-41,651,792 B (41.7 MB)**, arm 32,967,178 B, universal 98,501,359 B, debug
-~228.9 MB. Downloaded the published arm64 APK and matched its SHA-256
-(`61d006a1…caa142`) against `SHA256SUMS.txt`. The first universal build was
+Measured on the published files (commit `1bfb5ce`): **arm64 41,651,888 B
+(41.7 MB)**, arm 32.97 MB, universal 98.5 MB, debug ~229 MB.
+Downloaded the published arm64 APK and matched its SHA-256
+(`c53f788f…2275c1`) against `SHA256SUMS.txt`, and confirmed the new
+`Classic iOS`, `Change Profile Photo` and `Recent Calls` strings are compiled
+into `libapp.so`. The first universal build was
 120 MB because it packed three TDLib binaries (`arm64-v8a`, `armeabi-v7a`,
 `x86_64`) and unshrunk dex. R8 cut `classes.dex` from 9.7 MB to 2.8 MB, and the
 per-ABI splits leave exactly one `libtdjni.so` in each stable APK. Downloaded
@@ -71,6 +73,29 @@ the home-indicator inset to their bottom padding.
 Not verified: frame timings on a device. This environment has no emulator
 (`/dev/kvm` denied) and no Telegram account, so the improvement is argued from
 removed per-frame work, not measured fps.
+
+## Settings overhaul and material switch (2026-11-22)
+
+Settings now follows the current iOS screen: a centred 96 pt avatar with name
+and `phone · @username`, Edit in the nav-bar position, then opaque group cards —
+Change Profile Photo, Recent Calls, Devices, Notifications and Sounds, Privacy
+and Security, Data and Storage, Appearance. Change Profile Photo is a real
+upload (`TdApi.SetProfilePhoto` with `InputFileLocal`, then `GetMe` refreshes the
+profile); Recent Calls switches to the Calls tab instead of opening a second
+history view.
+
+Appearance → Material switches the whole app between `GlassStyle.liquid` and
+`GlassStyle.classic`. Classic returns an opaque `Container` from `GlassPanel`
+(no shader, no backdrop filter) and replaces the colour field in the shell and
+the conversation with a flat background. `test/glass_mode_test.dart` asserts the
+`GlassSurface` disappears after the switch.
+
+The tab bar paints exactly one selection shape. It previously drew a resting pill
+and a held lens in the same slot, which is what showed two tiles for a moment on
+tap. One capsule now swells into the lens and glides between slots; a tap commits
+the tapped tab immediately while the shape animates to it.
+`test/tab_bar_test.dart` measures the travelling shape mid-glide and checks it
+commits the tapped tab.
 
 ## Phase 1 — Flutter rewrite
 
