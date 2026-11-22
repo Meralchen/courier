@@ -15,9 +15,9 @@ verified end-to-end in this environment, `[ ]` not implemented.
 - [x] TDLib dependency (`io.github.tdlib-android:core:0.1.1`, JNI for 3 ABIs).
 - [x] `TdlibClient`: single `Client`, update stream → `StateFlow`s.
 - [x] `setTdlibParameters` with per-install TDLib database directory.
-- [x] Ships the OwpenGram application credentials as build-time defaults, so the
-      app goes straight to the phone screen; `COURIER_API_ID`/`COURIER_API_HASH`
-      (Gradle property, env or `local.properties`) override them.
+- [x] Ships the OwpenGram application credentials as build-time defaults (blank
+      `COURIER_API_ID`/`COURIER_API_HASH` fall back to them), so the app opens
+      on the phone screen; Gradle property, env or `local.properties` override.
 - [x] Auth state machine: `waitTdlibParameters` → `waitPhoneNumber` →
       `waitCode` → `waitPassword` → `ready`; error surfacing per step.
 - [~] Phone login: code path implemented (`setAuthenticationPhoneNumber`),
@@ -69,26 +69,26 @@ verified end-to-end in this environment, `[ ]` not implemented.
       and publishes it to the `courier-debug-latest` GitHub release
       (`https://github.com/Meralchen/courier/releases/download/courier-debug-latest/Courier-debug.apk`).
 - [x] Source published: `Meralchen/courier` (default branch) and
-      `allondu/Telegram-iOS_fork` (branch `android-port`).
+      `allondu/Telegram-iOS_fork` (branch `android-port`, same workflow/release).
 - [x] Documentation: README, architecture, this tracker.
 - [ ] Signed release APK (needs the owner's keystore).
 - [ ] Play Store packaging (AAB, per-ABI splits).
 
-## Build verification (2026-11-21)
+## Build verification (2026-11-22)
 
-- `:app:assembleDebug` — **BUILD SUCCESSFUL** with Kotlin 2.0.21, AGP 8.4.2,
-  Gradle 8.7 and JDK 17 against Android SDK 34.
-- APK: `dist/Courier-1.0-debug.apk` (~70 MB), package `com.courier.messenger`,
-  versionCode 1, minSdk 26, targetSdk 34, label `Courier`, debug-signed
-  (`apksigner verify` passes).
-  SHA-256 `51a4766f88bc3d6bda15a78b6af88ef67f429c3b0f88ba5d5248c36414629396`.
+- CI build (`Android APK` workflow, JDK 17 + SDK 34 + Gradle 8.7): **success**
+  for both repositories.
+- APK: ~70 MB, package `com.courier.messenger`, versionCode 1, minSdk 26,
+  targetSdk 34, label `Courier`, debug-signed, 140 zip entries, TDLib native
+  lib present.
+- `dist/` now carries the artifact built by the GitHub workflow; the OwpenGram
+  `api_id`/`api_hash` are verified present in `classes6.dex`/`classes7.dex`.
+  SHA-256 `16c0c7d6c09018b9eb8fa86ec518535a74b94c1a29cfcfabaffd32c693de1dc2`.
 - Launcher activity `com.courier.messenger.MainActivity` is exported with the
   MAIN/LAUNCHER intent filter.
-- Native libs packaged: `arm64-v8a` 22.7 MB, `armeabi-v7a` 16.4 MB,
-  `x86_64` 25.3 MB (`libtdjni.so`).
-- TDLib Java API is in the dex (3831 `org/drinkless/tdlib` references) — the
-  client is not a stub, it ships the real engine.
-- Gradle wrapper generated (`gradlew`, 8.7) so CI and local builds are reproducible.
+- Native libs packaged: `arm64-v8a`, `armeabi-v7a`, `x86_64` (`libtdjni.so`).
+- TDLib Java API is in the dex (thousands of `org/drinkless/tdlib` references) —
+  the client is not a stub, it ships the real engine.
 
 ## Known verification gaps
 
