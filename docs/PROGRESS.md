@@ -25,12 +25,12 @@ and attaches them to the
 - `SHA256SUMS.txt` — checksums for all four. A rebuild replaces the APKs and the
   sums together, so read this file rather than a checksum copied into a document.
 
-Measured on the published files (commit `1bfb5ce`): **arm64 41,651,888 B
-(41.7 MB)**, arm 32.97 MB, universal 98.5 MB, debug ~229 MB.
+Measured on the published files (commit `80853df`): **arm64 41,668,272 B
+(41.7 MB)**, arm 32.98 MB, universal 98.5 MB, debug ~229 MB.
 Downloaded the published arm64 APK and matched its SHA-256
-(`c53f788f…2275c1`) against `SHA256SUMS.txt`, and confirmed the new
-`Classic iOS`, `Change Profile Photo` and `Recent Calls` strings are compiled
-into `libapp.so`. The first universal build was
+(`10360731…48a4`) against `SHA256SUMS.txt`, confirmed `Unviewed story` is
+compiled into `libapp.so`, and found `GetChatActiveStories`,
+`UpdateChatActiveStories` and `TelegramStoriesKt` in `classes.dex`. The first universal build was
 120 MB because it packed three TDLib binaries (`arm64-v8a`, `armeabi-v7a`,
 `x86_64`) and unshrunk dex. R8 cut `classes.dex` from 9.7 MB to 2.8 MB, and the
 per-ABI splits leave exactly one `libtdjni.so` in each stable APK. Downloaded
@@ -96,6 +96,29 @@ tap. One capsule now swells into the lens and glides between slots; a tap commit
 the tapped tab immediately while the shape animates to it.
 `test/tab_bar_test.dart` measures the travelling shape mid-glide and checks it
 commits the tapped tab.
+
+## Story circles (2026-11-22)
+
+TDLib has no "all stories" call, so `TelegramStories.kt` asks
+`GetChatActiveStories` for the private and supergroup chats the engine already
+holds (capped at 60), caches the answers in `TelegramEngine.activeStories` and
+publishes one payload. `UpdateChatActiveStories` keeps that cache current when a
+story is posted, viewed or expires, and republishes without another round trip
+through TDLib.
+
+The row appears above the chat list only when somebody has stories. Each circle
+is the poster's avatar (58 pt) inside a 66 pt ring with a 2.6 pt stroke: a
+`SweepGradient` from blue through violet to pink, rotated to start at twelve
+o'clock, while `maxReadStoryId` is behind the newest `StoryInfo.storyId`; the
+separator colour once everything is seen. Only `StoryListMain` entries are
+shown, newest first, and the label is the first name as in iOS.
+
+Tapping a circle opens that chat. The full-screen player (`OpenStory`,
+`GetStory`, story content download) is not part of this build, so the ring is
+currently the only story surface.
+
+`test/stories_row_test.dart` covers the unread ring state, the first-name label
+and the tap target.
 
 ## Phase 1 — Flutter rewrite
 
