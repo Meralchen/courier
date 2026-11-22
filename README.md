@@ -18,17 +18,18 @@ Two APKs are built by GitHub Actions and attached to the
 
 | Build | File | What it is |
 | --- | --- | --- |
-| Stable, arm64 | [`Courier-1.0-arm64.apk`](https://github.com/Meralchen/courier/releases/download/courier-latest/Courier-1.0-arm64.apk) | 64-bit ARM, R8-shrunk with a single TDLib binary. **Start here.** |
-| Stable, arm 32-bit | [`Courier-1.0-arm.apk`](https://github.com/Meralchen/courier/releases/download/courier-latest/Courier-1.0-arm.apk) | For older or low-end phones |
-| Stable, universal | [`Courier-1.0-universal.apk`](https://github.com/Meralchen/courier/releases/download/courier-latest/Courier-1.0-universal.apk) | Both ARM ABIs in one file |
-| Debug | [`Courier-1.0-debug.apk`](https://github.com/Meralchen/courier/releases/download/courier-latest/Courier-1.0-debug.apk) | Debug build with diagnostics |
+| Stable, arm64 | [`Courier-1.0-arm64.apk`](https://github.com/Meralchen/courier/releases/download/courier-latest/Courier-1.0-arm64.apk) | 41.6 MB — 64-bit ARM, R8-shrunk with a single TDLib binary. **Start here.** |
+| Stable, arm 32-bit | [`Courier-1.0-arm.apk`](https://github.com/Meralchen/courier/releases/download/courier-latest/Courier-1.0-arm.apk) | 32.9 MB — for older or low-end phones |
+| Stable, universal | [`Courier-1.0-universal.apk`](https://github.com/Meralchen/courier/releases/download/courier-latest/Courier-1.0-universal.apk) | 98.4 MB — both ARM ABIs in one file |
+| Debug | [`Courier-1.0-debug.apk`](https://github.com/Meralchen/courier/releases/download/courier-latest/Courier-1.0-debug.apk) | 229 MB — debug build with diagnostics |
 
 `SHA256SUMS.txt` is published beside them. Requires Android 8.0+ (minSdk 26).
 
 ### Why the stable APKs are small
 
 The first Flutter build packed three TDLib binaries (`arm64-v8a`,
-`armeabi-v7a`, `x86_64`) and unshrunk dex into one 120 MB file. The release now:
+`armeabi-v7a`, `x86_64`) and unshrunk dex into one 120 MB file. The release now
+ships a **41.6 MB arm64 APK** — about two thirds smaller — because it:
 
 - builds per ABI, so an arm64 phone downloads exactly one TDLib binary;
 - runs R8 (`isMinifyEnabled`) and resource shrinking, with keeps only for

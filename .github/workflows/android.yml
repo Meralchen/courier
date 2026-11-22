@@ -106,7 +106,7 @@ jobs:
             without a private keystore; that is not a Play Store upload.
             `SHA256SUMS.txt` has the checksums for every file.
 
-            Both are built from `${{ github.sha }}`. Android 8.0+ (minSdk 26).
+            Every file is built from `${{ github.sha }}`. Android 8.0+ (minSdk 26).
             Sign in with your own Telegram phone number; Telegram may ask for the
             login code and, if enabled, your 2FA password.
           files: |

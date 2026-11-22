@@ -25,13 +25,15 @@ and attaches them to the
 - `SHA256SUMS.txt` — checksums for all four. A rebuild replaces the APKs and the
   sums together, so read this file rather than a checksum copied into a document.
 
-The first universal build was 120 MB because it packed three TDLib binaries
-(`arm64-v8a`, `armeabi-v7a`, `x86_64`) and unshrunk dex. Release now runs R8 and
-resource shrinking and builds per ABI, so an arm64 phone downloads one binary.
-The published stable APK was inspected with `aapt2`/`unzip`: package
-`com.courier.messenger`, version 1.0.0, targetSdk 36,
-`assets/flutter_assets/packages/liquiglass/shaders/liquid_glass.frag`, and a
-single `libtdjni.so` in the per-ABI build.
+Measured on the published files (run #15, commit `d27c02a`): **arm64 41.6 MB**,
+arm 32.9 MB, universal 98.4 MB, debug 228.8 MB. The first universal build was
+120 MB because it packed three TDLib binaries (`arm64-v8a`, `armeabi-v7a`,
+`x86_64`) and unshrunk dex. R8 cut `classes.dex` from 9.7 MB to 2.8 MB, and the
+per-ABI splits leave exactly one `libtdjni.so` in each stable APK. Downloaded
+the published arm64 APK and matched its SHA-256 against `SHA256SUMS.txt`;
+`aapt2` reports package `com.courier.messenger`, targetSdk 36, native-code
+`arm64-v8a`, and `assets/flutter_assets/packages/liquiglass/shaders/liquid_glass.frag`
+is present.
 
 ### Signing and shrinking
 
