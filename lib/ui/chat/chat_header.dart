@@ -125,10 +125,10 @@ class ChatHeader extends StatelessWidget {
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: GlassCircleButton(
+                  padding: const EdgeInsets.only(right: 4),
+                  child: NavIconButton(
                     icon: Icons.info_outline,
-                    size: 32,
+                    size: 22,
                     tooltip: 'Chat info',
                     onTap: onInfo,
                   ),

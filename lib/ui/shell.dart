@@ -20,10 +20,33 @@ class MainShell extends StatefulWidget {
 class MainShellState extends State<MainShell> {
   int _tab = 2;
   bool _showingError = false;
+  TelegramStore? _store;
 
   void goToTab(int index) {
     if (_tab == index) return;
     setState(() => _tab = index);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final TelegramStore store = TelegramScope.read(context);
+    if (identical(store, _store)) return;
+    _store?.removeListener(_onStoreChanged);
+    _store = store..addListener(_onStoreChanged);
+    _onStoreChanged();
+  }
+
+  void _onStoreChanged() {
+    final TelegramStore? store = _store;
+    if (store == null || !mounted) return;
+    _showPendingError(store);
+  }
+
+  @override
+  void dispose() {
+    _store?.removeListener(_onStoreChanged);
+    super.dispose();
   }
 
   void _showPendingError(TelegramStore store) {
@@ -47,8 +70,6 @@ class MainShellState extends State<MainShell> {
   @override
   Widget build(BuildContext context) {
     final AppColors colors = AppColors.of(context);
-    final TelegramStore store = TelegramScope.of(context);
-    _showPendingError(store);
 
     return Scaffold(
       backgroundColor: colors.background,
@@ -65,20 +86,28 @@ class MainShellState extends State<MainShell> {
           Positioned.fill(
             child: IndexedStack(
               index: _tab,
-              children: const <Widget>[
-                ContactsScreen(),
-                CallsScreen(),
-                ChatListScreen(),
-                SettingsScreen(),
+              children: <Widget>[
+                const ContactsScreen(),
+                const CallsScreen(),
+                const ChatListScreen(),
+                // Settings is a grouped list, not a glass stage: iOS paints it
+                // on a solid grouped background with opaque cards.
+                ColoredBox(
+                  color: colors.groupedBackground,
+                  child: const SettingsScreen(),
+                ),
               ],
             ),
           ),
           Align(
             alignment: Alignment.bottomCenter,
-            child: CourierTabBar(
-              selected: _tab,
-              unread: store.totalUnread,
-              onSelect: goToTab,
+            child: StoreSelector<int>(
+              select: (TelegramStore store) => store.totalUnread,
+              builder: (BuildContext context, int unread) => CourierTabBar(
+                selected: _tab,
+                unread: unread,
+                onSelect: goToTab,
+              ),
             ),
           ),
         ],

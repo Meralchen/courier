@@ -52,6 +52,9 @@ smaller than the old build because of R8.
   divider; opening a chat marks it read.
 - Sending text and photos from the gallery; replies, edits, deletes and copying
   from a message action sheet.
+- Static (WebP) stickers render at their aspect ratio inside a conversation;
+  animated `.tgs` stickers fall back to the sticker's emoji, since Flutter has
+  no Lottie renderer in this build.
 - Photo viewer, shared-media grid and chat info with members and actions.
 - Pin, mute, clear history and delete chat from the chat list or chat info.
 - Contacts tab derived from private chats, with alphabetical sections and search.
@@ -62,10 +65,12 @@ smaller than the old build because of R8.
 
 **Interface**
 - `liquiglass` `GlassSurface` panels with the package's real fragment shader on
-  Impeller, plus an animated colour wallpaper behind them.
-- Glass everywhere it belongs: the chats header, conversation bar, tab bar,
-  composer, search field, cards, sheets and circular buttons. See
-  [Liquid glass](#liquid-glass) for what the material actually does.
+  Impeller, over a still colour backdrop.
+- Glass where Telegram actually puts it: the chats header, conversation bar,
+  tab bar, composer, sheets and floating buttons. Content — settings cards,
+  search fields, nav-bar icons, rows — is opaque, as it is in Telegram-iOS.
+  See [Liquid glass](#liquid-glass) for what the material does and
+  [Performance](#performance) for why it is placed that way.
 - iOS geometry: 34 pt large titles that collapse into a centred nav-bar title,
   54 pt chat avatars, 18 pt bubbles with tails, hairline separators, grouped
   settings cards, tick marks and the blue `#007AFF` accent.
@@ -78,8 +83,9 @@ smaller than the old build because of R8.
 
 ## What is not implemented
 
-Voice/video notes, video and animated sticker playback, reactions, polls,
-forwarding, global message search, VoIP calls, secret chats, folders/archive,
+Voice/video notes, video playback, reactions, polls, forwarding, global message
+search, VoIP calls (the tgcalls engine is not part of this build, so the Calls
+tab lists no history and cannot dial), secret chats, folders/archive,
 group administration, contact import, profile-photo upload, push
 notifications, multi-account, localization and a tablet layout. See
 [docs/ROADMAP.md](docs/ROADMAP.md) for the expanded list and
@@ -127,6 +133,32 @@ flutter build apk --release \
   --dart-define=COURIER_API_HASH=0123456789abcdef0123456789abcdef
 ```
 
+## Performance
+
+The first glass build was heavy for three separate reasons, all now removed
+rather than hidden behind lower quality:
+
+- **The wallpaper no longer moves.** `LiquidWallpaper` used to step a
+  full-screen gradient at ~15 Hz. Every glass surface above it re-runs its
+  backdrop filter whenever the backdrop changes, so that drift re-shaded the
+  header, composer, tab bar and every card many times a second. The field is now
+  painted once per size and theme; scrolling content supplies the motion.
+- **Material only where iOS uses it.** Settings cards, search fields, nav-bar
+  icons, empty-state circles and the calls screen are opaque. A settings screen
+  that used to stack a backdrop filter per card group now uses none; the chats
+  screen went from six filters to two (header and tab bar).
+- **No rebuild storms.** TDLib emits updates for typing, presence and every few
+  kilobytes of a download. Notifications are coalesced per microtask, file
+  progress reports only every 5 %, and `StoreSelector` narrows a rebuild to the
+  slice a widget draws — a keystroke in one chat no longer rebuilds the shell,
+  chat list and contacts behind it.
+- **Cached transcript.** The chat screen reuses its built rows until the message
+  list object, media version, typing state or theme changes, so typing and
+  download progress no longer rebuild every bubble in a long history.
+- **Steady header.** The pinned chats header keeps its tint and materialisation
+  fixed; only the title cross-fade animates, so the shader is not re-armed on
+  every scroll offset.
+
 ## Liquid glass
 
 The material is [`shayann07/liquidglass`](https://github.com/shayann07/liquidglass)'s
@@ -143,9 +175,9 @@ production fragment shader over the live backdrop, wrapped by `GlassPanel` in
 - **Accessibility.** Increase Contrast is passed to the shader as
   `increasedContrast`; Reduce Motion and accessible navigation turn off
   materialisation, press springs and the wallpaper drift.
-- **A bounded wallpaper.** `LiquidWallpaper` drives `CustomPaint` through a
-  `ValueNotifier` and steps its phase coarsely (about 15 Hz on a 64 s cycle),
-  so the background never rebuilds widgets and never repaints needlessly.
+- **A still backdrop.** `LiquidWallpaper` paints a fixed colour field once per
+  size and theme. A drifting full-screen gradient forced every panel above it to
+  re-filter continuously; that was the app's largest source of jank.
 
 On Android 13+ this is the real AGSL refraction; below 13 the package falls back
 to a tinted, rim-lit blur, which the same widgets pick up automatically.
@@ -162,7 +194,7 @@ not copied from it:
 | Conversation | Centred avatar + name + presence in the glass bar; bubbles with tails, ticks, day and unread dividers; scroll-to-latest |
 | Composer | Glass capsule input inside a glass bar, attachment/emoji, send that becomes a mic when empty |
 | Tabs | Floating glass bar; hold to swell the pill into a lens 4 pt proud of the bar and 16 pt wider than a slot, the tab under it grows to 1.18 and turns accent, drag follows the finger with a haptic per tab, flick throws it, release settles; unread badge and TalkBack actions |
-| Settings | Grouped glass cards, 29 pt coloured icons, hairline separators, iOS switches and segmented controls |
+| Settings | Grouped opaque cards on the system grouped background, 29 pt coloured icons, hairline separators, iOS switches and a segmented control whose pill slides between options |
 
 ## Architecture in one paragraph
 

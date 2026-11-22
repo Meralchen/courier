@@ -1,7 +1,5 @@
 import 'dart:math' as math;
 
-import 'package:flutter/foundation.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:liquiglass/liquiglass.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -473,7 +471,15 @@ class GlassPrimaryButton extends StatelessWidget {
 /// repaint listenable, so a drift step repaints the wallpaper without rebuilding
 /// a single widget. Steps are coarse (the field is deliberately slow) and the
 /// drift stops entirely when the system asks for reduced motion.
-class LiquidWallpaper extends StatefulWidget {
+/// The backdrop the glass bars sample.
+///
+/// It used to drift a full-screen gradient at ~15 Hz. Every [GlassSurface]
+/// above it re-runs its backdrop filter whenever the backdrop changes, so that
+/// drift re-shaded the chat header, composer, tab bar and every card many times
+/// a second — the largest single source of jank in the app. The field is now
+/// static: the glass still bends it, and content scrolling underneath gives it
+/// all the motion it needs.
+class LiquidWallpaper extends StatelessWidget {
   const LiquidWallpaper({
     super.key,
     required this.base,
@@ -486,56 +492,13 @@ class LiquidWallpaper extends StatefulWidget {
   final double intensity;
 
   @override
-  State<LiquidWallpaper> createState() => _LiquidWallpaperState();
-}
-
-class _LiquidWallpaperState extends State<LiquidWallpaper>
-    with SingleTickerProviderStateMixin {
-  static const Duration _period = Duration(seconds: 64);
-  static const double _step = 0.004;
-
-  final ValueNotifier<double> _phase = ValueNotifier<double>(0);
-  late final Ticker _ticker = createTicker(_onTick);
-  bool _running = false;
-
-  void _onTick(Duration elapsed) {
-    final double next =
-        (elapsed.inMicroseconds % _period.inMicroseconds) / _period.inMicroseconds;
-    if ((next - _phase.value).abs() >= _step || next < _phase.value) {
-      _phase.value = next;
-    }
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final bool reduced = MediaQuery.disableAnimationsOf(context) ||
-        MediaQuery.accessibleNavigationOf(context);
-    if (reduced && _running) {
-      _ticker.stop();
-      _running = false;
-    } else if (!reduced && !_running) {
-      _running = true;
-      _ticker.start();
-    }
-  }
-
-  @override
-  void dispose() {
-    _ticker.dispose();
-    _phase.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return RepaintBoundary(
       child: CustomPaint(
         painter: _WallpaperPainter(
-          phase: _phase,
-          base: widget.base,
-          dark: widget.dark,
-          intensity: widget.intensity,
+          base: base,
+          dark: dark,
+          intensity: intensity,
         ),
         child: const SizedBox.expand(),
       ),
@@ -545,20 +508,23 @@ class _LiquidWallpaperState extends State<LiquidWallpaper>
 
 class _WallpaperPainter extends CustomPainter {
   _WallpaperPainter({
-    required this.phase,
     required this.base,
     required this.dark,
     required this.intensity,
-  }) : super(repaint: phase);
+  });
 
-  final ValueListenable<double> phase;
   final Color base;
   final bool dark;
   final double intensity;
 
+  /// Fixed composition: an asymmetric field, brighter top-left, warm
+  /// bottom-right, so bars and the lens catch different colours along their
+  /// length.
+  static const double _phase = 0.62;
+
   @override
   void paint(Canvas canvas, Size size) {
-    final double t = phase.value * math.pi * 2;
+    final double t = _phase * math.pi * 2;
     final Rect rect = Offset.zero & size;
     canvas.drawRect(rect, Paint()..color = base);
 

@@ -32,9 +32,13 @@ with the material behaviour iOS adds around the shader:
 - Reduce Motion skips materialisation, press springs and wallpaper drift.
 
 Surfaces built on it: `GlassBar` (tab bar, conversation bar, composer),
-`GlassCard` (grouped settings, sheets), `GlassField` (search and message
-inputs), `GlassCircleButton` (compose, back, info, scroll-to-latest) and
-`LiquidWallpaper`.
+`GlassCard` (sheets, photo viewer, form fields), `GlassCircleButton`
+(compose, scroll-to-latest) and the chats header.
+
+Telegram only puts material on bars, sheets and the composer, so Courier does
+the same. `SettingsGroup`, `IosSearchField`, `NavIconButton` and empty states are
+opaque: a settings card group used to carry its own backdrop filter, and the
+chat header carried one per icon, which cost frames for no visual gain.
 
 On devices where the shader cannot run (or below Android 13), `liquiglass`
 degrades to a frosted, rim-lit surface; the same widgets pick it up and the app
@@ -58,8 +62,11 @@ still lays out correctly.
   scrolls under the glass header.
 - Scroll-to-latest fades in when the conversation leaves the bottom.
 - Route pushes use the Cupertino slide; avatars use Hero between list and chat.
-- The wallpaper drifts continuously without rebuilding widgets and stops under
-  Reduce Motion.
+- The wallpaper is still. A drifting full-screen field forced every glass
+  surface above it to re-run its backdrop filter continuously; the motion now
+  comes from the content scrolling under the bars.
+- The segmented control slides one pill between options instead of cross-fading
+  a background per option.
 
 ## Deliberate differences
 

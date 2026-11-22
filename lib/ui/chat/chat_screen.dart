@@ -42,6 +42,16 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   int _lastCount = 0;
   bool _didInitialJump = false;
 
+  // Bubbles are expensive to build (layout, media, copy). TDLib notifies for
+  // typing and files too; rebuilding every bubble for those is what made a
+  // long chat stutter. Rows are reused until the message list object, the
+  // media version, typing state or theme actually change.
+  List<Widget>? _cachedRows;
+  List<Message>? _cachedMessages;
+  int _cachedFiles = -1;
+  bool _cachedTyping = false;
+  bool _cachedDark = false;
+
   @override
   void initState() {
     super.initState();
@@ -287,7 +297,22 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     final TelegramStore store = TelegramScope.of(context);
     final ChatSummary? chat = store.chat(widget.chatId);
     final List<Message> messages = store.messagesFor(widget.chatId);
-    final List<Widget> rows = _rows(messages, chat, store);
+    final bool rowsFresh = _cachedRows != null &&
+        identical(messages, _cachedMessages) &&
+        store.filesVersion == _cachedFiles &&
+        (chat?.typing ?? false) == _cachedTyping &&
+        colors.dark == _cachedDark;
+    final List<Widget> rows;
+    if (rowsFresh) {
+      rows = _cachedRows!;
+    } else {
+      rows = _rows(messages, chat, store);
+      _cachedRows = rows;
+      _cachedMessages = messages;
+      _cachedFiles = store.filesVersion;
+      _cachedTyping = chat?.typing ?? false;
+      _cachedDark = colors.dark;
+    }
 
     if (!_didInitialJump && messages.isNotEmpty) {
       _didInitialJump = true;
@@ -313,22 +338,42 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           Column(
             children: <Widget>[
               Expanded(
-                child: messages.isEmpty
-                    ? const _EmptyConversation()
-                    : ListView.builder(
-                        controller: _scroll,
-                        keyboardDismissBehavior:
-                            ScrollViewKeyboardDismissBehavior.onDrag,
-                        padding: EdgeInsets.fromLTRB(
-                          2,
-                          MediaQuery.paddingOf(context).top + 66,
-                          2,
-                          10,
+                // The jump-to-latest button lives in the transcript, not the
+                // page: anchoring it to the scaffold put it over the composer
+                // as soon as a reply preview made the composer taller.
+                child: Stack(
+                  children: <Widget>[
+                    Positioned.fill(
+                      child: messages.isEmpty
+                          ? const _EmptyConversation()
+                          : ListView.builder(
+                              controller: _scroll,
+                              keyboardDismissBehavior:
+                                  ScrollViewKeyboardDismissBehavior.onDrag,
+                              padding: EdgeInsets.fromLTRB(
+                                2,
+                                MediaQuery.paddingOf(context).top + 66,
+                                2,
+                                10,
+                              ),
+                              itemCount: rows.length,
+                              itemBuilder: (BuildContext context, int index) =>
+                                  rows[index],
+                            ),
+                    ),
+                    if (!_nearBottom)
+                      Positioned(
+                        right: 12,
+                        bottom: 12,
+                        child: GlassCircleButton(
+                          icon: Icons.keyboard_arrow_down,
+                          size: 38,
+                          tooltip: 'Scroll to latest',
+                          onTap: () => _scheduleJump(animate: true),
                         ),
-                        itemCount: rows.length,
-                        itemBuilder: (BuildContext context, int index) =>
-                            rows[index],
                       ),
+                  ],
+                ),
               ),
               Composer(
                 controller: _draft,
@@ -358,17 +403,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               ),
             ),
           ),
-          if (!_nearBottom)
-            Positioned(
-              right: 12,
-              bottom: MediaQuery.paddingOf(context).bottom + 78,
-              child: GlassCircleButton(
-                icon: Icons.keyboard_arrow_down,
-                size: 38,
-                tooltip: 'Scroll to latest',
-                onTap: () => _scheduleJump(animate: true),
-              ),
-            ),
           if (_loadingMore)
             Positioned(
               top: MediaQuery.paddingOf(context).top + 66,

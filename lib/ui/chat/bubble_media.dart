@@ -42,12 +42,27 @@ class BubbleMedia extends StatelessWidget {
           ),
         );
       }
+      // Animated stickers are gzipped Lottie (.tgs); Flutter cannot decode them
+      // without a renderer, so show the sticker's emoji instead of an error.
+      if (path.toLowerCase().endsWith('.tgs')) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 2),
+          child: Text(
+            message.text.isEmpty ? '🌟' : message.text,
+            style: const TextStyle(fontSize: 52),
+          ),
+        );
+      }
+      final double aspect = message.width > 0 && message.height > 0
+          ? message.width / message.height
+          : 1;
+      final double side = 150;
       return GestureDetector(
         onTap: onPhotoTap,
         child: Image.file(
           File(path),
-          width: 132,
-          height: 132,
+          width: aspect >= 1 ? side : side * aspect,
+          height: aspect >= 1 ? side / aspect : side,
           fit: BoxFit.contain,
           errorBuilder: (BuildContext _, Object __, StackTrace? ___) => Text(
             message.text.isEmpty ? '🌟' : message.text,

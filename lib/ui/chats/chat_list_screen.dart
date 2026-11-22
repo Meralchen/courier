@@ -8,7 +8,6 @@ import '../../state/scopes.dart';
 import '../../telegram/models.dart';
 import '../../telegram/telegram_store.dart';
 import '../chat/chat_screen.dart';
-import '../components/glass.dart';
 import '../components/ios_ui.dart';
 import 'chat_row.dart';
 import 'new_chat_screen.dart';
@@ -57,8 +56,16 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final TelegramStore store = TelegramScope.read(context);
+    return StoreSelector<Object>(
+      select: (TelegramStore store) =>
+          '${store.chatsVersion}|${store.totalUnread}|${store.connection}',
+      builder: (BuildContext context, Object _) => _build(context, store),
+    );
+  }
+
+  Widget _build(BuildContext context, TelegramStore store) {
     final AppColors colors = AppColors.of(context);
-    final TelegramStore store = TelegramScope.of(context);
     final List<ChatSummary> all = _filtered(store.chats);
     final List<ChatSummary> pinned =
         all.where((ChatSummary chat) => chat.pinned).toList();
@@ -205,9 +212,13 @@ class _ChatsHeader extends SliverPersistentHeaderDelegate {
             child: GlassSurface(
               radius: 0,
               dark: colors.dark,
-              tintAmount: 30 + 30 * t,
+              // Fixed, not interpolated with the scroll offset: changing the
+              // tint or materialisation every frame re-runs the shader and
+              // re-rasterises the whole pinned header while you scroll. Only
+              // the title cross-fade animates now.
+              tintAmount: 46,
               light: const Offset(0, -1),
-              materialize: 0.55 + 0.45 * t,
+              materialize: 0.8,
               child: const SizedBox.expand(),
             ),
           ),
@@ -265,18 +276,16 @@ class _ChatsHeader extends SliverPersistentHeaderDelegate {
                     ],
                   ),
                 ),
-                GlassCircleButton(
+                NavIconButton(
                   icon: Icons.search,
-                  size: 34,
+                  size: 21,
                   tooltip: 'Search',
                   onTap: () => focusNode.requestFocus(),
                 ),
-                const SizedBox(width: 6),
-                GlassCircleButton(
+                NavIconButton(
                   icon: Icons.edit_outlined,
-                  size: 34,
+                  size: 21,
                   tooltip: 'New message',
-                  color: colors.accent,
                   onTap: onCompose,
                 ),
               ],
@@ -285,15 +294,14 @@ class _ChatsHeader extends SliverPersistentHeaderDelegate {
           Positioned(
             left: 14,
             right: 14,
-            bottom: 9,
-            height: 46,
-            child: GlassField(
+            bottom: 11,
+            height: 40,
+            child: IosSearchField(
               controller: controller,
               focusNode: focusNode,
               hint: 'Search for messages or users',
-              icon: Icons.search,
               onChanged: onChanged,
-              suffix: query.isEmpty
+              trailing: query.isEmpty
                   ? null
                   : IconButton(
                       onPressed: () {

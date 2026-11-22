@@ -8,7 +8,6 @@ import '../../telegram/telegram_store.dart';
 import '../chat/chat_screen.dart';
 import '../chats/new_chat_screen.dart';
 import '../components/avatar.dart';
-import '../components/glass.dart';
 import '../components/ios_ui.dart';
 import '../components/pressable.dart';
 
@@ -52,8 +51,15 @@ class _ContactsScreenState extends State<ContactsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final TelegramStore store = TelegramScope.read(context);
+    return StoreSelector<int>(
+      select: (TelegramStore store) => store.chatsVersion,
+      builder: (BuildContext context, int _) => _build(context, store),
+    );
+  }
+
+  Widget _build(BuildContext context, TelegramStore store) {
     final AppColors colors = AppColors.of(context);
-    final TelegramStore store = TelegramScope.of(context);
     final String needle = _query.trim().toLowerCase();
     final List<ChatSummary> people = store.contacts
         .where((ChatSummary chat) =>
@@ -82,9 +88,8 @@ class _ContactsScreenState extends State<ContactsScreen> {
           SliverToBoxAdapter(
             child: LargeTitle(
               'Contacts',
-              trailing: GlassCircleButton(
+              trailing: NavIconButton(
                 icon: Icons.person_add_alt_1_outlined,
-                color: colors.accent,
                 tooltip: 'New message',
                 onTap: _compose,
               ),
@@ -93,10 +98,9 @@ class _ContactsScreenState extends State<ContactsScreen> {
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(14, 4, 14, 4),
-              child: GlassField(
+              child: IosSearchField(
                 controller: _search,
                 hint: 'Search',
-                icon: Icons.search,
                 onChanged: (String value) => setState(() => _query = value),
               ),
             ),

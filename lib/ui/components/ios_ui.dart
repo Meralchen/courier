@@ -3,7 +3,6 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../core/motion.dart';
 import '../../core/theme.dart';
-import 'glass.dart';
 import 'pressable.dart';
 
 class Hairline extends StatelessWidget {
@@ -54,20 +53,127 @@ class SettingsGroup extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final AppColors colors = AppColors.of(context);
+    // iOS group cards are opaque. Only bars, the composer and sheets are
+    // material — a backdrop filter per card group was both wrong and the most
+    // expensive thing on the Settings screen.
     return Padding(
       padding: padding ?? const EdgeInsets.symmetric(horizontal: 14),
-      child: GlassCard(
-        padding: EdgeInsets.zero,
-        radius: 18,
-        tintAmount: colors.dark ? 48 : 34,
-        child: Column(
-          children: <Widget>[
-            for (int i = 0; i < children.length; i++) ...<Widget>[
-              if (i > 0) const Hairline(indent: 54),
-              children[i],
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: ColoredBox(
+          color: colors.card,
+          child: Column(
+            children: <Widget>[
+              for (int i = 0; i < children.length; i++) ...<Widget>[
+                if (i > 0) const Hairline(indent: 54),
+                children[i],
+              ],
             ],
-          ],
+          ),
         ),
+      ),
+    );
+  }
+}
+
+/// A navigation-bar glyph as iOS draws it: no material of its own on a 44 pt
+/// target. Telegram puts glass on the bar, never on each button; nesting a
+/// filter per icon in the chat header was pure cost.
+class NavIconButton extends StatelessWidget {
+  const NavIconButton({
+    super.key,
+    required this.icon,
+    this.onTap,
+    this.color,
+    this.tooltip,
+    this.size = 22,
+  });
+
+  final IconData icon;
+  final VoidCallback? onTap;
+  final Color? color;
+  final String? tooltip;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final Widget button = Pressable(
+      onTap: onTap,
+      scale: 0.9,
+      child: SizedBox(
+        width: 44,
+        height: 44,
+        child: Icon(
+          icon,
+          size: size,
+          color: color ?? AppColors.of(context).accent,
+        ),
+      ),
+    );
+    return tooltip == null ? button : Tooltip(message: tooltip!, child: button);
+  }
+}
+
+/// The iOS search field: a flat rounded fill sitting on the bar's blur. A glass
+/// field inside a glass bar doubles the backdrop work for no visual gain, and
+/// iOS does not do it either.
+class IosSearchField extends StatelessWidget {
+  const IosSearchField({
+    super.key,
+    required this.controller,
+    this.focusNode,
+    this.hint = 'Search',
+    this.onChanged,
+    this.trailing,
+  });
+
+  final TextEditingController controller;
+  final FocusNode? focusNode;
+  final String hint;
+  final ValueChanged<String>? onChanged;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final AppColors colors = AppColors.of(context);
+    return Container(
+      height: 40,
+      padding: const EdgeInsets.only(left: 8, right: 4),
+      decoration: BoxDecoration(
+        color: colors.dark
+            ? Colors.white.withValues(alpha: 0.11)
+            : Colors.black.withValues(alpha: 0.055),
+        borderRadius: BorderRadius.circular(11),
+      ),
+      child: Row(
+        children: <Widget>[
+          Icon(Icons.search, size: 18, color: colors.textSecondary),
+          const SizedBox(width: 6),
+          Expanded(
+            child: TextField(
+              controller: controller,
+              focusNode: focusNode,
+              onChanged: onChanged,
+              textInputAction: TextInputAction.search,
+              style: AppText.body.copyWith(
+                fontSize: 16,
+                color: colors.textPrimary,
+              ),
+              cursorColor: colors.accent,
+              decoration: InputDecoration(
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(vertical: 11),
+                border: InputBorder.none,
+                hintText: hint,
+                hintStyle: AppText.body.copyWith(
+                  fontSize: 16,
+                  color: colors.textSecondary,
+                ),
+              ),
+            ),
+          ),
+          if (trailing != null) trailing!,
+        ],
       ),
     );
   }
@@ -241,50 +347,83 @@ class IosSegmented<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final AppColors colors = AppColors.of(context);
-    return GlassCard(
+    final int index = values.indexOf(selected).clamp(0, values.length - 1);
+    return Container(
       padding: const EdgeInsets.all(3),
-      radius: 12,
-      tintAmount: colors.dark ? 50 : 34,
-      child: Row(
-        children: <Widget>[
-          for (int i = 0; i < values.length; i++)
-            Expanded(
-              child: Pressable(
-                onTap: () => onChanged(values[i]),
-                scale: 0.97,
-                child: AnimatedContainer(
+      decoration: BoxDecoration(
+        color: colors.dark
+            ? Colors.white.withValues(alpha: 0.08)
+            : Colors.black.withValues(alpha: 0.045),
+        borderRadius: BorderRadius.circular(11),
+      ),
+      child: LayoutBuilder(
+        builder: (BuildContext context, BoxConstraints constraints) {
+          final double slot = constraints.maxWidth / values.length;
+          return SizedBox(
+            height: 32,
+            child: Stack(
+              children: <Widget>[
+                // iOS slides one pill between segments; the old per-segment
+                // background cross-faded two highlights in the same frame.
+                AnimatedAlign(
                   duration: Motion.normal,
                   curve: Motion.emphasized,
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(9),
-                    color: values[i] == selected
-                        ? colors.card
-                        : Colors.transparent,
-                    boxShadow: values[i] == selected
-                        ? <BoxShadow>[
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.10),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
-                            ),
-                          ]
-                        : null,
+                  alignment: Alignment(
+                    values.length == 1
+                        ? 0
+                        : -1 + 2 * index / (values.length - 1),
+                    0,
                   ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    labels[i],
-                    style: AppText.subhead.copyWith(
-                      fontWeight: values[i] == selected
-                          ? FontWeight.w600
-                          : FontWeight.w400,
-                      color: colors.textPrimary,
+                  child: Container(
+                    width: slot,
+                    height: 32,
+                    margin: const EdgeInsets.symmetric(horizontal: 3),
+                    decoration: BoxDecoration(
+                      color: colors.card,
+                      borderRadius: BorderRadius.circular(8),
+                      boxShadow: <BoxShadow>[
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.10),
+                          blurRadius: 5,
+                          offset: const Offset(0, 1.5),
+                        ),
+                      ],
                     ),
                   ),
                 ),
-              ),
+                Row(
+                  children: <Widget>[
+                    for (int i = 0; i < values.length; i++)
+                      Expanded(
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () {
+                            if (values[i] == selected) return;
+                            Haptics.tap();
+                            onChanged(values[i]);
+                          },
+                          child: Center(
+                            child: AnimatedDefaultTextStyle(
+                              duration: Motion.normal,
+                              curve: Motion.emphasized,
+                              style: AppText.subhead.copyWith(
+                                fontSize: 13.5,
+                                color: colors.textPrimary,
+                                fontWeight: i == index
+                                    ? FontWeight.w600
+                                    : FontWeight.w400,
+                              ),
+                              child: Text(labels[i]),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
             ),
-        ],
+          );
+        },
       ),
     );
   }
@@ -341,7 +480,17 @@ class EmptyState extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
-            GlassCircleButton(icon: icon, size: 76, color: colors.textSecondary),
+            Container(
+              width: 76,
+              height: 76,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: colors.dark
+                    ? Colors.white.withValues(alpha: 0.07)
+                    : Colors.black.withValues(alpha: 0.045),
+              ),
+              child: Icon(icon, size: 30, color: colors.textSecondary),
+            ),
             const SizedBox(height: 18),
             Text(
               title,

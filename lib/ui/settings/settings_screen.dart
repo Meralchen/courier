@@ -10,7 +10,6 @@ import '../../state/scopes.dart';
 import '../../telegram/models.dart';
 import '../../telegram/telegram_store.dart';
 import '../components/avatar.dart';
-import '../components/glass.dart';
 import '../components/ios_ui.dart';
 import '../components/pressable.dart';
 import '../components/sheets.dart';
@@ -52,8 +51,12 @@ class SettingsScreen extends StatelessWidget {
                   builder: (BuildContext _) => const EditProfileScreen(),
                 ),
               ),
-              child: GlassCard(
+              child: Container(
                 padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: colors.card,
+                  borderRadius: BorderRadius.circular(18),
+                ),
                 child: Row(
                   children: <Widget>[
                     Avatar(
@@ -152,7 +155,7 @@ class SettingsScreen extends StatelessWidget {
               ),
             ],
           ),
-          const SectionLabel('Appearance'),
+          const SectionLabel('General'),
           SettingsGroup(
             children: <Widget>[
               SettingsRow(

@@ -29,6 +29,14 @@ class TelegramStore extends ChangeNotifier {
 
   final Map<int, String> filePaths = <int, String>{};
   final Map<int, double> fileProgress = <int, double>{};
+
+  /// Bumped whenever a downloaded path or progress arrives. Views that cache
+  /// built rows key off it so a finished photo still replaces its placeholder.
+  int filesVersion = 0;
+
+  /// Bumped when the chat list changes. Typing and file updates must not bump
+  /// it, so screens showing only the list are not rebuilt for them.
+  int chatsVersion = 0;
   final Set<int> _requestedFiles = <int>{};
 
   List<SessionInfo> sessions = const <SessionInfo>[];
@@ -86,6 +94,21 @@ class TelegramStore extends ChangeNotifier {
     return null;
   }
 
+  // --------------------------------------------------------- change signals
+
+  bool _notifyScheduled = false;
+
+  /// Coalesces bursts of TDLib events (one history load is dozens of updates)
+  /// into a single rebuild per microtask drain instead of one per event.
+  void _notify() {
+    if (_notifyScheduled) return;
+    _notifyScheduled = true;
+    scheduleMicrotask(() {
+      _notifyScheduled = false;
+      notifyListeners();
+    });
+  }
+
   // ------------------------------------------------------------------ boot
 
   Future<void> boot() async {
@@ -100,7 +123,7 @@ class TelegramStore extends ChangeNotifier {
     } catch (error) {
       lastError = error.toString();
       auth = auth.copyWith(stage: AuthStage.error, error: error.toString());
-      notifyListeners();
+      _notify();
     }
   }
 
@@ -108,7 +131,7 @@ class TelegramStore extends ChangeNotifier {
   Future<void> retryEngine() async {
     booted = false;
     auth = const AuthState();
-    notifyListeners();
+    _notify();
     await boot();
   }
 
@@ -117,7 +140,7 @@ class TelegramStore extends ChangeNotifier {
       case 'auth':
         final AuthStage before = auth.stage;
         auth = AuthState.fromMap(event);
-        notifyListeners();
+        _notify();
         // TDLib closes itself after logout; a fresh client is needed to log in
         // again without restarting the app.
         if (auth.stage == AuthStage.closed && before != AuthStage.closed) {
@@ -134,7 +157,8 @@ class TelegramStore extends ChangeNotifier {
               return MapEntry<int, ChatSummary>(chat.id, chat);
             }),
           );
-        notifyListeners();
+        chatsVersion++;
+        _notify();
       case 'messages':
         final int chatId = asInt(event['chatId']);
         final int readOutbox = asInt(event['readOutboxMaxId']);
@@ -151,14 +175,15 @@ class TelegramStore extends ChangeNotifier {
         if (summary != null && list.isNotEmpty) {
           final Message last = list.last;
           _chats[chatId] = summary.copyWith(preview: last.text);
+          chatsVersion++;
         }
-        notifyListeners();
+        _notify();
       case 'profile':
         me = Profile.fromMap(asMap(event['profile']));
-        notifyListeners();
+        _notify();
       case 'connection':
         connection = asString(event['state'], 'Offline');
-        notifyListeners();
+        _notify();
       case 'file':
         final int fileId = asInt(event['fileId']);
         final String path = asString(event['path']);
@@ -166,24 +191,31 @@ class TelegramStore extends ChangeNotifier {
         if (path.isNotEmpty) {
           filePaths[fileId] = path;
           fileProgress.remove(fileId);
+          filesVersion++;
+          _notify();
         } else {
+          // A photo download emits progress every few kilobytes; repainting the
+          // chat for each one is what makes scrolling a media-heavy chat hitch.
+          final double previous = fileProgress[fileId] ?? 0;
+          if (progress < 1 && progress - previous < 0.05) return;
           fileProgress[fileId] = progress;
+          filesVersion++;
+          _notify();
         }
-        notifyListeners();
       case 'chatInfo':
         final ChatInfo info = ChatInfo.fromMap(asMap(event['info']));
         _chatInfos[info.chatId] = info;
-        notifyListeners();
+        _notify();
       case 'storage':
         storageSize = asInt(event['size']);
         storageCount = asInt(event['count']);
-        notifyListeners();
+        _notify();
       case 'debug':
         tdlibVersion = asString(event['version']);
-        notifyListeners();
+        _notify();
       case 'error':
         lastError = asString(event['message']);
-        notifyListeners();
+        _notify();
     }
   }
 
@@ -220,7 +252,7 @@ class TelegramStore extends ChangeNotifier {
     _messages.clear();
     _chatInfos.clear();
     await _guard(() => _client.call('logOut'));
-    notifyListeners();
+    _notify();
   }
 
   // ----------------------------------------------------------------- chats
@@ -229,7 +261,7 @@ class TelegramStore extends ChangeNotifier {
 
   Future<void> openChat(int chatId) async {
     openChatId = chatId;
-    notifyListeners();
+    _notify();
     await _guard(() => _client.call('openChat', <String, Object?>{'chatId': chatId}));
   }
 
@@ -319,7 +351,7 @@ class TelegramStore extends ChangeNotifier {
       );
     } catch (error) {
       lastError = error.toString();
-      notifyListeners();
+      _notify();
       return null;
     }
   }
@@ -349,10 +381,10 @@ class TelegramStore extends ChangeNotifier {
       sessions = (raw ?? const <Object?>[])
           .map((Object? item) => SessionInfo.fromMap(asMap(item)))
           .toList();
-      notifyListeners();
+      _notify();
     } catch (error) {
       lastError = error.toString();
-      notifyListeners();
+      _notify();
     }
   }
 
@@ -371,11 +403,11 @@ class TelegramStore extends ChangeNotifier {
       if (raw != null) {
         storageSize = asInt(raw['size']);
         storageCount = asInt(raw['count']);
-        notifyListeners();
+        _notify();
       }
     } catch (error) {
       lastError = error.toString();
-      notifyListeners();
+      _notify();
     }
   }
 
@@ -387,10 +419,10 @@ class TelegramStore extends ChangeNotifier {
         storageSize = asInt(raw['size']);
         storageCount = asInt(raw['count']);
       }
-      notifyListeners();
+      _notify();
     } catch (error) {
       lastError = error.toString();
-      notifyListeners();
+      _notify();
     }
   }
 
@@ -399,7 +431,7 @@ class TelegramStore extends ChangeNotifier {
       await action();
     } catch (error) {
       lastError = error.toString();
-      notifyListeners();
+      _notify();
     }
   }
 

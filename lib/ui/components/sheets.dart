@@ -34,7 +34,14 @@ Future<T?> showActionSheet<T>(
     builder: (BuildContext sheetContext) {
       final AppColors colors = AppColors.of(sheetContext);
       return Padding(
-        padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+        padding: EdgeInsets.fromLTRB(
+          10,
+          0,
+          10,
+          // `useSafeArea` only clears the status bar; an action sheet still has
+          // to sit above the home indicator or its last row is unreachable.
+          10 + MediaQuery.viewPaddingOf(sheetContext).bottom,
+        ),
         child: GlassCard(
           radius: GlassRadius.sheet,
           padding: const EdgeInsets.fromLTRB(8, 10, 8, 10),
