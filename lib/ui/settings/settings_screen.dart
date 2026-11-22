@@ -1,6 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
-import 'package:liquiglass/liquiglass.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../config.dart';
 import '../../core/format.dart';
@@ -13,21 +13,66 @@ import '../components/avatar.dart';
 import '../components/ios_ui.dart';
 import '../components/pressable.dart';
 import '../components/sheets.dart';
+import '../shell_scope.dart';
 import 'about_screen.dart';
 import 'appearance_screen.dart';
 import 'data_storage_screen.dart';
 import 'edit_profile_screen.dart';
+import 'notifications_screen.dart';
 import 'privacy_screen.dart';
 import 'sessions_screen.dart';
 
-class SettingsScreen extends StatelessWidget {
+/// Telegram-iOS settings: a centred identity block with Edit in the nav-bar
+/// position, then opaque group cards. There is no large title, because the
+/// profile block is the title.
+class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
-  String _themeLabel(AppSettings settings) => switch (settings.themeMode) {
-        ThemeMode.light => 'Light',
-        ThemeMode.dark => 'Dark',
-        ThemeMode.system => 'System',
-      };
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  bool _uploadingPhoto = false;
+
+  void _push(Widget screen) {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (BuildContext _) => screen));
+  }
+
+  String _identity(Profile? me) {
+    if (me == null) return 'Telegram account';
+    final List<String> parts = <String>[
+      if (me.phone.isNotEmpty) me.phone,
+      if (me.username.isNotEmpty) '@${me.username}',
+    ];
+    return parts.isEmpty ? 'Telegram account' : parts.join(' · ');
+  }
+
+  Future<void> _changePhoto() async {
+    try {
+      final XFile? picked = await ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1280,
+        imageQuality: 90,
+      );
+      if (picked == null || !mounted) return;
+      setState(() => _uploadingPhoto = true);
+      await TelegramScope.read(context).setProfilePhoto(picked.path);
+      if (!mounted) return;
+      setState(() => _uploadingPhoto = false);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Profile photo updated')));
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _uploadingPhoto = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not update the photo: $error')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -35,93 +80,156 @@ class SettingsScreen extends StatelessWidget {
     final TelegramStore store = TelegramScope.of(context);
     final AppSettings settings = SettingsScope.of(context);
     final Profile? me = store.me;
+    final ShellScope? shell = ShellScope.maybeOf(context);
 
     return SafeArea(
       bottom: false,
       child: ListView(
         physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.only(bottom: 140),
+        padding: const EdgeInsets.only(bottom: 150),
         children: <Widget>[
-          const LargeTitle('Settings'),
           Padding(
-            padding: const EdgeInsets.fromLTRB(14, 4, 14, 2),
-            child: Pressable(
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (BuildContext _) => const EditProfileScreen(),
-                ),
-              ),
-              child: Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: colors.card,
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: Row(
-                  children: <Widget>[
-                    Avatar(
-                      title: me?.name ?? 'Courier user',
-                      seed: me?.id ?? 1,
-                      size: 60,
-                      photoFileId: me?.photoFileId ?? 0,
-                      photoPath: me?.photoPath ?? '',
+            padding: const EdgeInsets.fromLTRB(16, 2, 10, 0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: <Widget>[
+                Pressable(
+                  onTap: () => _push(const EditProfileScreen()),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 8,
                     ),
-                    const SizedBox(width: 13),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: <Widget>[
-                          Text(
-                            me?.name ?? 'Courier user',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppText.headline.copyWith(
-                              color: colors.textPrimary,
-                              fontSize: 21,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            me?.username.isNotEmpty == true
-                                ? '@${me!.username}'
-                                : (me?.phone.isNotEmpty == true
-                                    ? me!.phone
-                                    : 'Telegram account'),
-                            style: AppText.subhead.copyWith(
-                              color: colors.textSecondary,
-                            ),
-                          ),
-                        ],
+                    child: Text(
+                      'Edit',
+                      style: AppText.body.copyWith(
+                        fontSize: 17,
+                        color: colors.accent,
                       ),
                     ),
-                    Icon(
-                      Icons.chevron_right,
-                      color: colors.textTertiary,
-                      size: 19,
-                    ),
-                  ],
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
-          const SectionLabel('Account'),
+          Column(
+            children: <Widget>[
+              Avatar(
+                title: me?.name ?? 'Courier user',
+                seed: me?.id ?? 1,
+                size: 96,
+                photoFileId: me?.photoFileId ?? 0,
+                photoPath: me?.photoPath ?? '',
+              ),
+              const SizedBox(height: 10),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Text(
+                  me?.name ?? 'Courier user',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppText.title.copyWith(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w600,
+                    color: colors.textPrimary,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                _identity(me),
+                style: AppText.subhead.copyWith(color: colors.textSecondary),
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+          SettingsGroup(
+            children: <Widget>[
+              SettingsRow(
+                label: _uploadingPhoto
+                    ? 'Uploading photo…'
+                    : 'Change Profile Photo',
+                icon: Icons.photo_camera_outlined,
+                onTap: _uploadingPhoto ? null : _changePhoto,
+                chevron: true,
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          SettingsGroup(
+            children: <Widget>[
+              SettingsRow(
+                label: 'Recent Calls',
+                icon: Icons.call_outlined,
+                iconColor: colors.success,
+                chevron: true,
+                onTap: () => shell?.goToTab(1),
+              ),
+              SettingsRow(
+                label: 'Devices',
+                subtitle: 'Devices signed in to this account',
+                icon: Icons.devices_outlined,
+                iconColor: colors.accent,
+                chevron: true,
+                onTap: () => _push(const SessionsScreen()),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          SettingsGroup(
+            children: <Widget>[
+              SettingsRow(
+                label: 'Notifications and Sounds',
+                icon: Icons.notifications,
+                iconColor: colors.danger,
+                chevron: true,
+                onTap: () => _push(const NotificationsScreen()),
+              ),
+              SettingsRow(
+                label: 'Privacy and Security',
+                icon: Icons.lock_outline,
+                iconColor: colors.textSecondary,
+                chevron: true,
+                onTap: () => _push(const PrivacyScreen()),
+              ),
+              SettingsRow(
+                label: 'Data and Storage',
+                value: store.storageSize > 0
+                    ? fileSizeLabel(store.storageSize)
+                    : null,
+                icon: Icons.storage_outlined,
+                iconColor: colors.success,
+                chevron: true,
+                onTap: () => _push(const DataStorageScreen()),
+              ),
+              SettingsRow(
+                label: 'Appearance',
+                value: settings.glassStyle == GlassStyle.liquid
+                    ? 'Liquid Glass'
+                    : 'Classic iOS',
+                icon: Icons.brightness_6_outlined,
+                iconColor: colors.accent,
+                chevron: true,
+                onTap: () => _push(const AppearanceScreen()),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
           SettingsGroup(
             children: <Widget>[
               SettingsRow(
                 label: 'Edit profile',
                 subtitle: 'Name, bio and username',
                 icon: Icons.person_outline,
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (BuildContext _) => const EditProfileScreen(),
-                  ),
-                ),
+                iconColor: colors.accent,
                 chevron: true,
+                onTap: () => _push(const EditProfileScreen()),
               ),
               SettingsRow(
                 label: 'Phone number',
                 value: me?.phone ?? '—',
                 icon: Icons.phone_outlined,
+                iconColor: colors.success,
                 onTap: () async {
                   final String phone = me?.phone ?? '';
                   if (phone.isEmpty) return;
@@ -132,107 +240,21 @@ class SettingsScreen extends StatelessWidget {
                   );
                 },
               ),
-              SettingsRow(
-                label: 'Active sessions',
-                subtitle: 'Devices signed in to this account',
-                icon: Icons.devices_outlined,
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (BuildContext _) => const SessionsScreen(),
-                  ),
-                ),
-                chevron: true,
-              ),
-              SettingsRow(
-                label: 'Privacy and security',
-                icon: Icons.lock_outline,
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (BuildContext _) => const PrivacyScreen(),
-                  ),
-                ),
-                chevron: true,
-              ),
             ],
           ),
-          const SectionLabel('General'),
+          const SizedBox(height: 18),
           SettingsGroup(
             children: <Widget>[
               SettingsRow(
-                label: 'Theme',
-                value: _themeLabel(settings),
-                icon: Icons.brightness_6_outlined,
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (BuildContext _) => const AppearanceScreen(),
-                  ),
-                ),
+                label: 'Courier',
+                subtitle: 'Version $kAppVersion ($kAppBuild)',
+                icon: Icons.info_outline,
+                iconColor: colors.accent,
                 chevron: true,
+                onTap: () => _push(const AboutScreen()),
               ),
               SettingsRow(
-                label: 'Liquid Glass',
-                subtitle: 'iOS 26 material over the live backdrop',
-                icon: Icons.blur_on,
-                value: LiquidGlass.isSupported ? 'Shader' : 'Frosted',
-              ),
-            ],
-          ),
-          const SectionLabel('Notifications'),
-          SettingsGroup(
-            children: <Widget>[
-              SettingsToggle(
-                label: 'Message notifications',
-                subtitle: 'In-app banners while Courier is open',
-                icon: Icons.notifications_outlined,
-                iconColor: colors.danger,
-                value: settings.notifications,
-                onChanged: settings.setNotifications,
-              ),
-              SettingsToggle(
-                label: 'Sounds',
-                icon: Icons.volume_up_outlined,
-                iconColor: colors.success,
-                value: settings.sounds,
-                onChanged: settings.setSounds,
-              ),
-            ],
-          ),
-          const SectionLabel('Data and storage'),
-          SettingsGroup(
-            children: <Widget>[
-              SettingsRow(
-                label: 'Storage and cache',
-                value: store.storageSize > 0
-                    ? fileSizeLabel(store.storageSize)
-                    : 'Open',
-                icon: Icons.storage_outlined,
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (BuildContext _) => const DataStorageScreen(),
-                  ),
-                ),
-                chevron: true,
-              ),
-              SettingsRow(
-                label: 'Refresh chats',
-                subtitle: 'Ask TDLib to reload the main chat list',
-                icon: Icons.refresh,
-                onTap: store.refreshChats,
-              ),
-            ],
-          ),
-          const SectionLabel('Connection'),
-          SettingsGroup(
-            children: <Widget>[
-              SettingsRow(
-                label: 'TDLib',
-                value: store.tdlibVersion.isEmpty
-                    ? 'loading…'
-                    : store.tdlibVersion,
-                icon: Icons.memory,
-              ),
-              SettingsRow(
-                label: 'Status',
+                label: 'Connection',
                 value: store.connection,
                 icon: Icons.wifi,
                 iconColor: store.connection == 'Connected'
@@ -240,29 +262,16 @@ class SettingsScreen extends StatelessWidget {
                     : colors.textSecondary,
               ),
               SettingsRow(
-                label: 'Chats synced',
-                value: '${store.chats.length}',
-                icon: Icons.chat_bubble_outline,
+                label: 'TDLib',
+                value: store.tdlibVersion.isEmpty
+                    ? 'loading…'
+                    : store.tdlibVersion,
+                icon: Icons.memory,
+                iconColor: colors.textSecondary,
               ),
             ],
           ),
-          const SectionLabel('About'),
-          SettingsGroup(
-            children: <Widget>[
-              SettingsRow(
-                label: 'Courier',
-                subtitle: 'Version $kAppVersion ($kAppBuild)',
-                icon: Icons.info_outline,
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (BuildContext _) => const AboutScreen(),
-                  ),
-                ),
-                chevron: true,
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 18),
           SettingsGroup(
             children: <Widget>[
               SettingsRow(

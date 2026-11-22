@@ -11,16 +11,16 @@ class TelegramScope extends InheritedNotifier<TelegramStore> {
   }) : super(notifier: store);
 
   static TelegramStore of(BuildContext context) {
-    final TelegramScope? scope =
-        context.dependOnInheritedWidgetOfExactType<TelegramScope>();
+    final TelegramScope? scope = context
+        .dependOnInheritedWidgetOfExactType<TelegramScope>();
     assert(scope != null, 'TelegramScope is missing above this widget');
     return scope!.notifier!;
   }
 
   /// Reads the store without subscribing; for callbacks.
   static TelegramStore read(BuildContext context) {
-    final TelegramScope? scope =
-        context.getInheritedWidgetOfExactType<TelegramScope>();
+    final TelegramScope? scope = context
+        .getInheritedWidgetOfExactType<TelegramScope>();
     assert(scope != null, 'TelegramScope is missing above this widget');
     return scope!.notifier!;
   }
@@ -33,11 +33,7 @@ class TelegramScope extends InheritedNotifier<TelegramStore> {
 /// this listens to the slice a widget actually draws, so a keystroke in one chat
 /// no longer rebuilds the shell and the chat list behind it.
 class StoreSelector<T> extends StatefulWidget {
-  const StoreSelector({
-    super.key,
-    required this.select,
-    required this.builder,
-  });
+  const StoreSelector({super.key, required this.select, required this.builder});
 
   final T Function(TelegramStore store) select;
   final Widget Function(BuildContext context, T value) builder;
@@ -86,9 +82,14 @@ class SettingsScope extends InheritedNotifier<AppSettings> {
   }) : super(notifier: settings);
 
   static AppSettings of(BuildContext context) {
-    final SettingsScope? scope =
-        context.dependOnInheritedWidgetOfExactType<SettingsScope>();
+    final SettingsScope? scope = context
+        .dependOnInheritedWidgetOfExactType<SettingsScope>();
     assert(scope != null, 'SettingsScope is missing above this widget');
     return scope!.notifier!;
   }
+
+  /// Reads the settings without requiring the scope; widgets that can be
+  /// pumped standalone (tests, previews) fall back to the default material.
+  static AppSettings? maybeOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<SettingsScope>()?.notifier;
 }

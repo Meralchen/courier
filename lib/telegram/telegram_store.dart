@@ -9,7 +9,8 @@ import 'telegram_client.dart';
 /// App-wide Telegram state. TDLib is the source of truth; this store keeps the
 /// last snapshot so widgets can render synchronously and rebuild on updates.
 class TelegramStore extends ChangeNotifier {
-  TelegramStore([TelegramClient? client]) : _client = client ?? TelegramClient();
+  TelegramStore([TelegramClient? client])
+    : _client = client ?? TelegramClient();
 
   final TelegramClient _client;
   StreamSubscription<Map<String, Object?>>? _subscription;
@@ -46,7 +47,8 @@ class TelegramStore extends ChangeNotifier {
   // ------------------------------------------------------------- selectors
 
   bool get signedIn => auth.stage == AuthStage.ready;
-  bool get needsLogin => auth.stage == AuthStage.waitPhone ||
+  bool get needsLogin =>
+      auth.stage == AuthStage.waitPhone ||
       auth.stage == AuthStage.waitCode ||
       auth.stage == AuthStage.waitPassword;
 
@@ -60,10 +62,13 @@ class TelegramStore extends ChangeNotifier {
   }
 
   List<ChatSummary> get contacts {
-    final List<ChatSummary> list =
-        _chats.values.where((ChatSummary c) => c.isPrivate).toList();
-    list.sort((ChatSummary a, ChatSummary b) =>
-        a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+    final List<ChatSummary> list = _chats.values
+        .where((ChatSummary c) => c.isPrivate)
+        .toList();
+    list.sort(
+      (ChatSummary a, ChatSummary b) =>
+          a.title.toLowerCase().compareTo(b.title.toLowerCase()),
+    );
     return list;
   }
 
@@ -71,9 +76,9 @@ class TelegramStore extends ChangeNotifier {
       chats.where((ChatSummary chat) => chat.pinned).toList();
 
   int get totalUnread => _chats.values.fold<int>(
-        0,
-        (int sum, ChatSummary chat) => sum + (chat.muted ? 0 : chat.unread),
-      );
+    0,
+    (int sum, ChatSummary chat) => sum + (chat.muted ? 0 : chat.unread),
+  );
 
   ChatSummary? chat(int id) => _chats[id];
 
@@ -162,13 +167,16 @@ class TelegramStore extends ChangeNotifier {
       case 'messages':
         final int chatId = asInt(event['chatId']);
         final int readOutbox = asInt(event['readOutboxMaxId']);
-        final List<Message> list = asList(event['messages'])
-            .map((Object? item) => Message.fromMap(asMap(item)))
-            .map((Message message) => message.outgoing
-                ? message.copyWith(read: message.id <= readOutbox)
-                : message)
-            .toList()
-          ..sort((Message a, Message b) => a.id.compareTo(b.id));
+        final List<Message> list =
+            asList(event['messages'])
+                .map((Object? item) => Message.fromMap(asMap(item)))
+                .map(
+                  (Message message) => message.outgoing
+                      ? message.copyWith(read: message.id <= readOutbox)
+                      : message,
+                )
+                .toList()
+              ..sort((Message a, Message b) => a.id.compareTo(b.id));
         _messages[chatId] = list;
         _hasMore[chatId] = asBool(event['hasMore']);
         final ChatSummary? summary = _chats[chatId];
@@ -241,8 +249,9 @@ class TelegramStore extends ChangeNotifier {
       _guard(() => _client.call('submitCode', <String, Object?>{'code': code}));
 
   Future<void> submitPassword(String password) => _guard(
-        () => _client.call('submitPassword', <String, Object?>{'password': password}),
-      );
+    () =>
+        _client.call('submitPassword', <String, Object?>{'password': password}),
+  );
 
   Future<void> resendCode() => _guard(() => _client.call('resendCode'));
 
@@ -262,7 +271,9 @@ class TelegramStore extends ChangeNotifier {
   Future<void> openChat(int chatId) async {
     openChatId = chatId;
     _notify();
-    await _guard(() => _client.call('openChat', <String, Object?>{'chatId': chatId}));
+    await _guard(
+      () => _client.call('openChat', <String, Object?>{'chatId': chatId}),
+    );
   }
 
   Future<void> closeChat() async {
@@ -270,70 +281,79 @@ class TelegramStore extends ChangeNotifier {
     await _guard(() => _client.call('closeChat'));
   }
 
-  Future<void> loadMore(int chatId) =>
-      _guard(() => _client.call('loadMore', <String, Object?>{'chatId': chatId}));
+  Future<void> loadMore(int chatId) => _guard(
+    () => _client.call('loadMore', <String, Object?>{'chatId': chatId}),
+  );
 
-  Future<void> markRead(int chatId) =>
-      _guard(() => _client.call('markRead', <String, Object?>{'chatId': chatId}));
+  Future<void> markRead(int chatId) => _guard(
+    () => _client.call('markRead', <String, Object?>{'chatId': chatId}),
+  );
 
-  Future<void> sendText(int chatId, String text, {int? replyToId}) =>
-      _guard(() => _client.call('sendText', <String, Object?>{
-            'chatId': chatId,
-            'text': text,
-            'replyToId': replyToId ?? 0,
-          }));
+  Future<void> sendText(int chatId, String text, {int? replyToId}) => _guard(
+    () => _client.call('sendText', <String, Object?>{
+      'chatId': chatId,
+      'text': text,
+      'replyToId': replyToId ?? 0,
+    }),
+  );
 
   Future<void> sendPhoto(
     int chatId,
     String path, {
     String caption = '',
     int? replyToId,
-  }) =>
-      _guard(() => _client.call('sendPhoto', <String, Object?>{
-            'chatId': chatId,
-            'path': path,
-            'caption': caption,
-            'replyToId': replyToId ?? 0,
-          }));
+  }) => _guard(
+    () => _client.call('sendPhoto', <String, Object?>{
+      'chatId': chatId,
+      'path': path,
+      'caption': caption,
+      'replyToId': replyToId ?? 0,
+    }),
+  );
 
-  Future<void> editMessage(int chatId, int messageId, String text) =>
-      _guard(() => _client.call('editMessage', <String, Object?>{
-            'chatId': chatId,
-            'messageId': messageId,
-            'text': text,
-          }));
+  Future<void> editMessage(int chatId, int messageId, String text) => _guard(
+    () => _client.call('editMessage', <String, Object?>{
+      'chatId': chatId,
+      'messageId': messageId,
+      'text': text,
+    }),
+  );
 
-  Future<void> deleteMessages(int chatId, List<int> ids) =>
-      _guard(() => _client.call('deleteMessages', <String, Object?>{
-            'chatId': chatId,
-            'messageIds': ids,
-          }));
+  Future<void> deleteMessages(int chatId, List<int> ids) => _guard(
+    () => _client.call('deleteMessages', <String, Object?>{
+      'chatId': chatId,
+      'messageIds': ids,
+    }),
+  );
 
-  Future<void> setPinned(int chatId, bool pinned) =>
-      _guard(() => _client.call('pinChat', <String, Object?>{
-            'chatId': chatId,
-            'pinned': pinned,
-          }));
+  Future<void> setPinned(int chatId, bool pinned) => _guard(
+    () => _client.call('pinChat', <String, Object?>{
+      'chatId': chatId,
+      'pinned': pinned,
+    }),
+  );
 
-  Future<void> setMuted(int chatId, bool muted) =>
-      _guard(() => _client.call('muteChat', <String, Object?>{
-            'chatId': chatId,
-            'muted': muted,
-          }));
+  Future<void> setMuted(int chatId, bool muted) => _guard(
+    () => _client.call('muteChat', <String, Object?>{
+      'chatId': chatId,
+      'muted': muted,
+    }),
+  );
 
-  Future<void> clearHistory(int chatId) =>
-      _guard(() => _client.call('clearHistory', <String, Object?>{'chatId': chatId}));
+  Future<void> clearHistory(int chatId) => _guard(
+    () => _client.call('clearHistory', <String, Object?>{'chatId': chatId}),
+  );
 
   Future<void> deleteChat(int chatId) => _guard(
-        () => _client.call('deleteChat', <String, Object?>{'chatId': chatId}),
-      );
+    () => _client.call('deleteChat', <String, Object?>{'chatId': chatId}),
+  );
 
   Future<void> sendTyping(int chatId, bool typing) => _guard(
-        () => _client.call('typing', <String, Object?>{
-          'chatId': chatId,
-          'typing': typing,
-        }),
-      );
+    () => _client.call('typing', <String, Object?>{
+      'chatId': chatId,
+      'typing': typing,
+    }),
+  );
 
   Future<void> ensureFile(int fileId) async {
     if (fileId == 0 || filePaths.containsKey(fileId)) return;
@@ -345,10 +365,9 @@ class TelegramStore extends ChangeNotifier {
 
   Future<int?> openUsername(String username) async {
     try {
-      return await _client.invoke<int>(
-        'openUsername',
-        <String, Object?>{'username': username},
-      );
+      return await _client.invoke<int>('openUsername', <String, Object?>{
+        'username': username,
+      });
     } catch (error) {
       lastError = error.toString();
       _notify();
@@ -356,8 +375,9 @@ class TelegramStore extends ChangeNotifier {
     }
   }
 
-  Future<void> loadChatInfo(int chatId) =>
-      _guard(() => _client.call('chatInfo', <String, Object?>{'chatId': chatId}));
+  Future<void> loadChatInfo(int chatId) => _guard(
+    () => _client.call('chatInfo', <String, Object?>{'chatId': chatId}),
+  );
 
   // --------------------------------------------------------------- profile
 
@@ -366,18 +386,26 @@ class TelegramStore extends ChangeNotifier {
     required String lastName,
     required String bio,
     required String username,
-  }) =>
-      _guard(() => _client.call('updateProfile', <String, Object?>{
-            'firstName': firstName,
-            'lastName': lastName,
-            'bio': bio,
-            'username': username,
-          }));
+  }) => _guard(
+    () => _client.call('updateProfile', <String, Object?>{
+      'firstName': firstName,
+      'lastName': lastName,
+      'bio': bio,
+      'username': username,
+    }),
+  );
+
+  /// Uploads a local image as the account photo. TDLib reads the file itself
+  /// and the `profile` update follows, so the header refreshes without a poll.
+  Future<void> setProfilePhoto(String path) => _guard(
+    () => _client.call('setProfilePhoto', <String, Object?>{'path': path}),
+  );
 
   Future<void> loadSessions() async {
     try {
-      final List<Object?>? raw =
-          await _client.invoke<List<Object?>>('sessions');
+      final List<Object?>? raw = await _client.invoke<List<Object?>>(
+        'sessions',
+      );
       sessions = (raw ?? const <Object?>[])
           .map((Object? item) => SessionInfo.fromMap(asMap(item)))
           .toList();
@@ -389,17 +417,18 @@ class TelegramStore extends ChangeNotifier {
   }
 
   Future<void> terminateSession(int sessionId) async {
-    await _guard(() => _client.call(
-          'terminateSession',
-          <String, Object?>{'sessionId': sessionId},
-        ));
+    await _guard(
+      () => _client.call('terminateSession', <String, Object?>{
+        'sessionId': sessionId,
+      }),
+    );
     await loadSessions();
   }
 
   Future<void> loadStorage() async {
     try {
-      final Map<String, Object?>? raw =
-          await _client.invoke<Map<String, Object?>>('storage');
+      final Map<String, Object?>? raw = await _client
+          .invoke<Map<String, Object?>>('storage');
       if (raw != null) {
         storageSize = asInt(raw['size']);
         storageCount = asInt(raw['count']);
@@ -413,8 +442,8 @@ class TelegramStore extends ChangeNotifier {
 
   Future<void> clearCache() async {
     try {
-      final Map<String, Object?>? raw =
-          await _client.invoke<Map<String, Object?>>('clearCache');
+      final Map<String, Object?>? raw = await _client
+          .invoke<Map<String, Object?>>('clearCache');
       if (raw != null) {
         storageSize = asInt(raw['size']);
         storageCount = asInt(raw['count']);

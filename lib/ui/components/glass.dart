@@ -5,6 +5,8 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../core/motion.dart';
 import '../../core/theme.dart';
+import '../../state/app_settings.dart';
+import '../../state/scopes.dart';
 import 'pressable.dart';
 
 /// Corner radii used by the glass language, matched to Telegram-iOS geometry.
@@ -59,10 +61,7 @@ class _GlassPanelState extends State<GlassPanel>
   void initState() {
     super.initState();
     if (widget.animateIn) {
-      _controller = AnimationController(
-        vsync: this,
-        duration: Motion.slow,
-      );
+      _controller = AnimationController(vsync: this, duration: Motion.slow);
     }
   }
 
@@ -70,7 +69,9 @@ class _GlassPanelState extends State<GlassPanel>
   void didChangeDependencies() {
     super.didChangeDependencies();
     final AnimationController? controller = _controller;
-    if (controller == null || controller.isAnimating || controller.isCompleted) {
+    if (controller == null ||
+        controller.isAnimating ||
+        controller.isCompleted) {
       return;
     }
     // Reduce Motion turns materialization into a plain appearance.
@@ -92,6 +93,21 @@ class _GlassPanelState extends State<GlassPanel>
     final AppColors colors = AppColors.of(context);
     final bool dark = widget.dark ?? colors.dark;
     final bool highContrast = MediaQuery.highContrastOf(context);
+
+    // Classic iOS: flat bars and cards, no shader, no backdrop filter. This is
+    // the same widget tree Telegram's pre-26 design used and costs nothing to
+    // paint, which also makes it the safe mode on weak GPUs.
+    if (SettingsScope.maybeOf(context)?.glassStyle == GlassStyle.classic) {
+      return Container(
+        padding: widget.padding,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(widget.radius),
+          color: dark ? const Color(0xFF1C1C1E) : Colors.white,
+          border: Border.all(color: colors.separator.withValues(alpha: 0.6)),
+        ),
+        child: widget.child,
+      );
+    }
 
     // The glass wraps the content, so it takes the content's size; the rim and
     // sheen are overlays and never change that size.
@@ -121,10 +137,7 @@ class _GlassPanelState extends State<GlassPanel>
                   )
                 : null,
           ),
-          child: Padding(
-            padding: widget.padding,
-            child: widget.child,
-          ),
+          child: Padding(padding: widget.padding, child: widget.child),
         ),
       );
     }
@@ -135,9 +148,8 @@ class _GlassPanelState extends State<GlassPanel>
     } else {
       panel = AnimatedBuilder(
         animation: _controller!,
-        builder: (BuildContext context, Widget? child) => surface(
-          Motion.emphasized.transform(_controller!.value),
-        ),
+        builder: (BuildContext context, Widget? child) =>
+            surface(Motion.emphasized.transform(_controller!.value)),
       );
     }
 
@@ -530,35 +542,35 @@ class _WallpaperPainter extends CustomPainter {
 
     final List<({Color color, double x, double y, double r, double a})> blobs =
         <({Color color, double x, double y, double r, double a})>[
-      (
-        color: const Color(0xFF2F8FFF),
-        x: 0.16 + 0.09 * math.sin(t),
-        y: 0.10 + 0.05 * math.cos(t * 1.2),
-        r: 0.66,
-        a: 0.32,
-      ),
-      (
-        color: const Color(0xFF39D2C0),
-        x: 0.88 + 0.07 * math.cos(t * 0.8),
-        y: 0.24 + 0.07 * math.sin(t * 1.1),
-        r: 0.58,
-        a: 0.28,
-      ),
-      (
-        color: const Color(0xFF9B6BFF),
-        x: 0.18 + 0.08 * math.cos(t * 1.4),
-        y: 0.80 + 0.04 * math.sin(t),
-        r: 0.62,
-        a: 0.30,
-      ),
-      (
-        color: const Color(0xFFFF9F6B),
-        x: 0.84 + 0.06 * math.sin(t * 0.7),
-        y: 0.90 + 0.04 * math.cos(t * 1.3),
-        r: 0.46,
-        a: 0.22,
-      ),
-    ];
+          (
+            color: const Color(0xFF2F8FFF),
+            x: 0.16 + 0.09 * math.sin(t),
+            y: 0.10 + 0.05 * math.cos(t * 1.2),
+            r: 0.66,
+            a: 0.32,
+          ),
+          (
+            color: const Color(0xFF39D2C0),
+            x: 0.88 + 0.07 * math.cos(t * 0.8),
+            y: 0.24 + 0.07 * math.sin(t * 1.1),
+            r: 0.58,
+            a: 0.28,
+          ),
+          (
+            color: const Color(0xFF9B6BFF),
+            x: 0.18 + 0.08 * math.cos(t * 1.4),
+            y: 0.80 + 0.04 * math.sin(t),
+            r: 0.62,
+            a: 0.30,
+          ),
+          (
+            color: const Color(0xFFFF9F6B),
+            x: 0.84 + 0.06 * math.sin(t * 0.7),
+            y: 0.90 + 0.04 * math.cos(t * 1.3),
+            r: 0.46,
+            a: 0.22,
+          ),
+        ];
     for (final ({Color color, double x, double y, double r, double a}) blob
         in blobs) {
       final Offset center = Offset(blob.x * size.width, blob.y * size.height);

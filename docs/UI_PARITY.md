@@ -67,6 +67,13 @@ still lays out correctly.
   comes from the content scrolling under the bars.
 - The segmented control slides one pill between options instead of cross-fading
   a background per option.
+- Tapping a tab glides the selection to it; the bar paints exactly one selection
+  shape (an inset capsule at rest that swells into the lens), so a tap never
+  shows a second tile.
+- Settings → Appearance → Material switches between Liquid Glass and Classic
+  iOS. Classic returns an opaque `Container` for every `GlassPanel` and a flat
+  background in the shell and conversation, with no shader and no backdrop
+  filter.
 
 ## Deliberate differences
 

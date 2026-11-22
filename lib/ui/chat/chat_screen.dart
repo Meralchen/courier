@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/format.dart';
 import '../../core/motion.dart';
 import '../../core/theme.dart';
+import '../../state/app_settings.dart';
 import '../../state/scopes.dart';
 import '../../telegram/models.dart';
 import '../../telegram/telegram_store.dart';
@@ -116,8 +117,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     final TelegramStore store = TelegramScope.read(context);
     if (_loadingMore || !store.hasMore(widget.chatId)) return;
     _loadingMore = true;
-    final ScrollPosition? position =
-        _scroll.hasClients ? _scroll.position : null;
+    final ScrollPosition? position = _scroll.hasClients
+        ? _scroll.position
+        : null;
     final double beforeMax = position?.maxScrollExtent ?? 0;
     final double beforePixels = position?.pixels ?? 0;
     await store.loadMore(widget.chatId);
@@ -125,10 +127,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_scroll.hasClients) return;
       final double delta = _scroll.position.maxScrollExtent - beforeMax;
-      _scroll.jumpTo((beforePixels + delta).clamp(
-        _scroll.position.minScrollExtent,
-        _scroll.position.maxScrollExtent,
-      ));
+      _scroll.jumpTo(
+        (beforePixels + delta).clamp(
+          _scroll.position.minScrollExtent,
+          _scroll.position.maxScrollExtent,
+        ),
+      );
     });
     _loadingMore = false;
   }
@@ -142,11 +146,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       );
       if (picked == null || !mounted) return;
       setState(() => _sendingPhoto = true);
-      await TelegramScope.read(context).sendPhoto(
-        widget.chatId,
-        picked.path,
-        replyToId: _reply?.id,
-      );
+      await TelegramScope.read(
+        context,
+      ).sendPhoto(widget.chatId, picked.path, replyToId: _reply?.id);
       if (!mounted) return;
       setState(() {
         _sendingPhoto = false;
@@ -166,11 +168,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     final int? replyId = _reply?.id;
     _draft.clear();
     setState(() => _reply = null);
-    await TelegramScope.read(context).sendText(
-      widget.chatId,
-      text,
-      replyToId: replyId,
-    );
+    await TelegramScope.read(
+      context,
+    ).sendText(widget.chatId, text, replyToId: replyId);
     _scheduleJump(animate: true);
   }
 
@@ -258,30 +258,32 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         continue;
       }
 
-      final bool samePrevious = previous != null &&
+      final bool samePrevious =
+          previous != null &&
           previous.outgoing == message.outgoing &&
           !previous.isService &&
           sameDay(previous.date, message.date);
-      final bool sameNext = next != null &&
+      final bool sameNext =
+          next != null &&
           next.outgoing == message.outgoing &&
           !next.isService &&
           sameDay(next.date, message.date);
-      final String imagePath =
-          store.pathFor(message.photoFileId, message.photoPath);
+      final String imagePath = store.pathFor(
+        message.photoFileId,
+        message.photoPath,
+      );
 
       rows.add(
         MessageBubble(
           message: message,
           isFirst: !samePrevious,
           isLast: !sameNext,
-          showSender: !message.outgoing &&
+          showSender:
+              !message.outgoing &&
               (!samePrevious || previous.sender != message.sender),
           onLongPress: () => _actions(message),
-          onPhotoTap: () => openPhoto(
-            context,
-            path: imagePath,
-            caption: message.text,
-          ),
+          onPhotoTap: () =>
+              openPhoto(context, path: imagePath, caption: message.text),
         ),
       );
     }
@@ -294,10 +296,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     final AppColors colors = AppColors.of(context);
+    final bool classic =
+        SettingsScope.maybeOf(context)?.glassStyle == GlassStyle.classic;
     final TelegramStore store = TelegramScope.of(context);
     final ChatSummary? chat = store.chat(widget.chatId);
     final List<Message> messages = store.messagesFor(widget.chatId);
-    final bool rowsFresh = _cachedRows != null &&
+    final bool rowsFresh =
+        _cachedRows != null &&
         identical(messages, _cachedMessages) &&
         store.filesVersion == _cachedFiles &&
         (chat?.typing ?? false) == _cachedTyping &&
@@ -329,11 +334,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       body: Stack(
         children: <Widget>[
           Positioned.fill(
-            child: LiquidWallpaper(
-              base: colors.chatBackdrop,
-              dark: colors.dark,
-              intensity: 0.8,
-            ),
+            child: classic
+                ? ColoredBox(color: colors.chatBackdrop)
+                : LiquidWallpaper(
+                    base: colors.chatBackdrop,
+                    dark: colors.dark,
+                    intensity: 0.8,
+                  ),
           ),
           Column(
             children: <Widget>[
@@ -552,12 +559,10 @@ class _TypingBubbleState extends State<_TypingBubble>
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 2),
                   child: Opacity(
-                    opacity: 0.35 +
+                    opacity:
+                        0.35 +
                         0.65 *
-                            ((1 -
-                                    ((_controller.value * 3 - i).abs() %
-                                        1)) *
-                                1)
+                            ((1 - ((_controller.value * 3 - i).abs() % 1)) * 1)
                                 .clamp(0.0, 1.0),
                     child: Container(
                       width: 6,

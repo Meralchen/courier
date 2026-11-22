@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../core/theme.dart';
+import '../state/app_settings.dart';
 import '../state/scopes.dart';
 import '../telegram/telegram_store.dart';
 import 'calls/calls_screen.dart';
@@ -8,6 +9,7 @@ import 'chats/chat_list_screen.dart';
 import 'components/glass.dart';
 import 'contacts/contacts_screen.dart';
 import 'settings/settings_screen.dart';
+import 'shell_scope.dart';
 import 'tab_bar.dart';
 
 class MainShell extends StatefulWidget {
@@ -70,47 +72,56 @@ class MainShellState extends State<MainShell> {
   @override
   Widget build(BuildContext context) {
     final AppColors colors = AppColors.of(context);
+    final bool classic =
+        SettingsScope.of(context).glassStyle == GlassStyle.classic;
 
     return Scaffold(
       backgroundColor: colors.background,
       extendBody: true,
-      body: Stack(
-        children: <Widget>[
-          Positioned.fill(
-            child: LiquidWallpaper(
-              base: colors.chatBackdrop,
-              dark: colors.dark,
-              intensity: 0.75,
+      body: ShellScope(
+        goToTab: goToTab,
+        child: Stack(
+          children: <Widget>[
+            Positioned.fill(
+              // Classic iOS has no colour field behind the app; the grouping
+              // background is the whole story.
+              child: classic
+                  ? ColoredBox(color: colors.background)
+                  : LiquidWallpaper(
+                      base: colors.chatBackdrop,
+                      dark: colors.dark,
+                      intensity: 0.75,
+                    ),
             ),
-          ),
-          Positioned.fill(
-            child: IndexedStack(
-              index: _tab,
-              children: <Widget>[
-                const ContactsScreen(),
-                const CallsScreen(),
-                const ChatListScreen(),
-                // Settings is a grouped list, not a glass stage: iOS paints it
-                // on a solid grouped background with opaque cards.
-                ColoredBox(
-                  color: colors.groupedBackground,
-                  child: const SettingsScreen(),
-                ),
-              ],
-            ),
-          ),
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: StoreSelector<int>(
-              select: (TelegramStore store) => store.totalUnread,
-              builder: (BuildContext context, int unread) => CourierTabBar(
-                selected: _tab,
-                unread: unread,
-                onSelect: goToTab,
+            Positioned.fill(
+              child: IndexedStack(
+                index: _tab,
+                children: <Widget>[
+                  const ContactsScreen(),
+                  const CallsScreen(),
+                  const ChatListScreen(),
+                  // Settings is a grouped list, not a glass stage: iOS paints it
+                  // on a solid grouped background with opaque cards.
+                  ColoredBox(
+                    color: colors.groupedBackground,
+                    child: const SettingsScreen(),
+                  ),
+                ],
               ),
             ),
-          ),
-        ],
+            Align(
+              alignment: Alignment.bottomCenter,
+              child: StoreSelector<int>(
+                select: (TelegramStore store) => store.totalUnread,
+                builder: (BuildContext context, int unread) => CourierTabBar(
+                  selected: _tab,
+                  unread: unread,
+                  onSelect: goToTab,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

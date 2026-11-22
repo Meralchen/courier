@@ -41,6 +41,32 @@ internal fun TelegramEngine.updateProfile(
     }
 }
 
+internal fun TelegramEngine.setProfilePhoto(path: String, result: MethodChannel.Result) {
+    val c = client ?: run {
+        result.error("tdlib", "TDLib is not running", null)
+        return
+    }
+    c.send(
+        TdApi.SetProfilePhoto(TdApi.InputChatPhotoStatic(TdApi.InputFileLocal(path)), false),
+    ) { reply ->
+        main.post {
+            if (reply is TdApi.Error) {
+                emitError(reply.message)
+                result.error("tdlib", reply.message, null)
+            } else {
+                c.send(TdApi.GetMe()) { me ->
+                    if (me is TdApi.User) {
+                        myId = me.id
+                        users[me.id] = me
+                        publishProfile()
+                    }
+                }
+                result.success(null)
+            }
+        }
+    }
+}
+
 internal fun TelegramEngine.requestChatInfo(chatId: Long, result: MethodChannel.Result) {
     val chat = chats[chatId] ?: run {
         result.error("tdlib", "Chat is not loaded yet", null)

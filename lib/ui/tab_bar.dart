@@ -1,3 +1,5 @@
+import 'dart:ui' show lerpDouble;
+
 import 'package:material_ui/material_ui.dart';
 
 import '../core/motion.dart';
@@ -35,27 +37,19 @@ class _CourierTabBarState extends State<CourierTabBar>
     with TickerProviderStateMixin {
   static const List<({IconData icon, IconData active, String label})> _tabs =
       <({IconData icon, IconData active, String label})>[
-    (
-      icon: Icons.person_outline,
-      active: Icons.person,
-      label: 'Contacts',
-    ),
-    (
-      icon: Icons.call_outlined,
-      active: Icons.call,
-      label: 'Calls',
-    ),
-    (
-      icon: Icons.chat_bubble_outline,
-      active: Icons.chat_bubble,
-      label: 'Chats',
-    ),
-    (
-      icon: Icons.settings_outlined,
-      active: Icons.settings,
-      label: 'Settings',
-    ),
-  ];
+        (icon: Icons.person_outline, active: Icons.person, label: 'Contacts'),
+        (icon: Icons.call_outlined, active: Icons.call, label: 'Calls'),
+        (
+          icon: Icons.chat_bubble_outline,
+          active: Icons.chat_bubble,
+          label: 'Chats',
+        ),
+        (
+          icon: Icons.settings_outlined,
+          active: Icons.settings,
+          label: 'Settings',
+        ),
+      ];
 
   static const double _barHeight = 56;
   static const double _lensOverflow = 4;
@@ -85,6 +79,7 @@ class _CourierTabBarState extends State<CourierTabBar>
   int _marked = 0;
   bool _held = false;
   bool _dragging = false;
+  bool _didDrag = false;
   bool _reduceMotion = false;
 
   @override
@@ -131,20 +126,31 @@ class _CourierTabBarState extends State<CourierTabBar>
   /// Touch-down: the lens arrives at the tab under the finger and keeps the
   /// finger's offset up to half its own width, so grabbing beside it brings it.
   void _arrive(double x) {
+    final int index = _indexAt(x);
+    _marked = index;
+    _didDrag = false;
     if (_reduceMotion) return;
     _held = true;
-    final int index = _indexAt(x);
     final double halfLens = (_slot + _lensExtraWidth) / 2;
     _grab = (x - _centerOf(index.toDouble())).clamp(-halfLens, halfLens);
-    _slide.value = index.toDouble();
-    _marked = index;
     _form.forward();
+    // Glide instead of snapping: tapping a distant tab should look like the
+    // lens travelling there, not a jump. Dragging takes over by writing
+    // _slide.value directly, which stops this animation.
+    _slide.stop();
+    _slide.animateTo(
+      index.toDouble(),
+      duration: Motion.fast,
+      curve: Motion.emphasized,
+    );
   }
 
   void _follow(double x) {
     if (_reduceMotion || _slot <= 0) return;
-    final double index =
-        ((x - _grab) / _slot - 0.5).clamp(0.0, (_tabs.length - 1).toDouble());
+    final double index = ((x - _grab) / _slot - 0.5).clamp(
+      0.0,
+      (_tabs.length - 1).toDouble(),
+    );
     _slide.value = index;
     final int marked = index.round();
     if (marked != _marked) {
@@ -155,9 +161,16 @@ class _CourierTabBarState extends State<CourierTabBar>
 
   void _settle(double velocity) {
     _dragging = false;
-    int target = _slide.value.round();
-    if (velocity.abs() > _flingVelocity) {
-      target = (_slide.value + (velocity > 0 ? 0.5 : -0.5)).round();
+    int target;
+    if (!_didDrag) {
+      // A tap commits the tab it landed on even while the lens is still
+      // gliding towards it.
+      target = _marked;
+    } else {
+      target = _slide.value.round();
+      if (velocity.abs() > _flingVelocity) {
+        target = (_slide.value + (velocity > 0 ? 0.5 : -0.5)).round();
+      }
     }
     target = target.clamp(0, _tabs.length - 1);
     _held = false;
@@ -191,7 +204,8 @@ class _CourierTabBarState extends State<CourierTabBar>
             height: _barHeight + 2 * _lensOverflow + 6,
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onTapDown: (TapDownDetails details) => _arrive(details.localPosition.dx),
+              onTapDown: (TapDownDetails details) =>
+                  _arrive(details.localPosition.dx),
               onTapUp: (TapUpDetails details) => _settle(0),
               // Losing the tap to the drag recogniser is not a cancel: the drag
               // handlers own the lens from that point.
@@ -200,6 +214,7 @@ class _CourierTabBarState extends State<CourierTabBar>
               },
               onHorizontalDragStart: (DragStartDetails details) {
                 _dragging = true;
+                _didDrag = true;
                 if (!_held) _arrive(details.localPosition.dx);
               },
               onHorizontalDragUpdate: (DragUpdateDetails details) =>
@@ -216,7 +231,6 @@ class _CourierTabBarState extends State<CourierTabBar>
                   final double lift = _formed.value;
                   final double index = _slide.value;
                   final double center = _centerOf(index);
-                  final double lensWidth = _slot + _lensExtraWidth;
                   final double barTop = _lensOverflow + 2;
                   return Stack(
                     clipBehavior: Clip.none,
@@ -238,58 +252,67 @@ class _CourierTabBarState extends State<CourierTabBar>
                           ),
                         ),
                       ),
-                      // At rest: the inset selection pill.
+                      // ONE selection shape: an inset capsule at rest that
+                      // swells into the lens under a finger. The bar used to
+                      // paint a resting pill *and* a lens in the same slot,
+                      // which is why a tap showed two tiles for a moment.
                       Positioned(
-                        left: index * _slot + 5,
-                        top: barTop + 5,
-                        width: _slot - 10,
-                        height: _barHeight - 10,
-                        child: Opacity(
-                          opacity: (1 - lift).clamp(0.0, 1.0),
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(18),
-                              color: colors.dark
-                                  ? Colors.white.withValues(alpha: 0.10)
-                                  : Colors.white.withValues(alpha: 0.55),
+                        left:
+                            center -
+                            lerpDouble(
+                                  _slot - 10,
+                                  _slot + _lensExtraWidth,
+                                  lift,
+                                )! /
+                                2,
+                        top: lerpDouble(barTop + 5, 0, lift)!,
+                        width: lerpDouble(
+                          _slot - 10,
+                          _slot + _lensExtraWidth,
+                          lift,
+                        )!,
+                        height: lerpDouble(
+                          _barHeight - 10,
+                          _barHeight + 2 * _lensOverflow,
+                          lift,
+                        )!,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(
+                              lerpDouble(18, 24, lift)!,
+                            ),
+                            boxShadow: lift > 0.02
+                                ? <BoxShadow>[
+                                    BoxShadow(
+                                      color: Colors.black.withValues(
+                                        alpha: 0.30 * lift,
+                                      ),
+                                      blurRadius: 14,
+                                      offset: const Offset(0, 5),
+                                    ),
+                                  ]
+                                : null,
+                          ),
+                          child: GlassPanel(
+                            radius: lerpDouble(18, 24, lift)!,
+                            dark: colors.dark,
+                            tintAmount: lerpDouble(46, 52, lift)!,
+                            animateIn: false,
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(
+                                  lerpDouble(18, 24, lift)!,
+                                ),
+                                color: Colors.white.withValues(
+                                  alpha:
+                                      (colors.dark ? 0.12 : 0.60) * (1 - lift),
+                                ),
+                              ),
+                              child: const SizedBox.expand(),
                             ),
                           ),
                         ),
                       ),
-                      // The held lens: proud of the bar, wider than a slot.
-                      if (!_reduceMotion)
-                        Positioned(
-                          left: center - lensWidth / 2,
-                          top: 0,
-                          width: lensWidth,
-                          height: _barHeight + 2 * _lensOverflow,
-                          child: Opacity(
-                            opacity: lift.clamp(0.0, 1.0),
-                            child: Transform.scale(
-                              scale: 0.94 + 0.06 * lift,
-                              child: DecoratedBox(
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(24),
-                                  boxShadow: <BoxShadow>[
-                                    BoxShadow(
-                                      color: Colors.black
-                                          .withValues(alpha: 0.30 * lift),
-                                      blurRadius: 14,
-                                      offset: const Offset(0, 5),
-                                    ),
-                                  ],
-                                ),
-                                child: GlassPanel(
-                                  radius: 24,
-                                  dark: colors.dark,
-                                  tintAmount: colors.dark ? 52 : 40,
-                                  animateIn: false,
-                                  child: const SizedBox.expand(),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
                       // Tabs, above the lens, the one under it magnified.
                       Positioned(
                         left: 0,
@@ -305,8 +328,10 @@ class _CourierTabBarState extends State<CourierTabBar>
                                   activeIcon: _tabs[i].active,
                                   label: _tabs[i].label,
                                   selected: i == widget.selected,
-                                  proximity:
-                                      (1 - (index - i).abs()).clamp(0.0, 1.0),
+                                  proximity: (1 - (index - i).abs()).clamp(
+                                    0.0,
+                                    1.0,
+                                  ),
                                   lift: lift,
                                   badge: i == 2 ? widget.unread : 0,
                                   colors: colors,

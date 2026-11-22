@@ -81,6 +81,10 @@ smaller than the old build because of R8.
   a flick carries it to the next tab. Plus a capsule composer that grows to five
   lines, scroll-to-latest, pull-to-refresh, spring press-scale and Hero avatars.
 - Light, dark and system appearance, persisted with `shared_preferences`.
+- **Liquid Glass or Classic iOS** as a switch in Settings → Appearance: the
+  liquid material runs the shader and the colour field; Classic iOS paints
+  opaque bars and cards on the system grouped background with no shader and no
+  blur behind the app.
 
 ## What is not implemented
 
@@ -183,6 +187,11 @@ production fragment shader over the live backdrop, wrapped by `GlassPanel` in
 On Android 13+ this is the real AGSL refraction; below 13 the package falls back
 to a tinted, rim-lit blur, which the same widgets pick up automatically.
 
+Settings → Appearance → **Material** switches the whole app to Classic iOS, which
+returns the opaque `Container` from `GlassPanel` and drops the colour field from
+the shell and the conversation. It is both the iOS 13–18 look and the fast path
+on GPUs where the shader is expensive.
+
 ## Telegram-iOS surface
 
 Recreated from the Telegram-iOS client's structure (SwiftUI/UIKit in
@@ -195,7 +204,7 @@ not copied from it:
 | Conversation | Centred avatar + name + presence in the glass bar; bubbles with tails, ticks, day and unread dividers; scroll-to-latest |
 | Composer | Glass capsule input inside a glass bar, attachment/emoji, send that becomes a mic when empty |
 | Tabs | Floating glass bar; hold to swell the pill into a lens 4 pt proud of the bar and 16 pt wider than a slot, the tab under it grows to 1.18 and turns accent, drag follows the finger with a haptic per tab, flick throws it, release settles; unread badge and TalkBack actions |
-| Settings | Grouped opaque cards on the system grouped background, 29 pt coloured icons, hairline separators, iOS switches and a segmented control whose pill slides between options |
+| Settings | Centred avatar, name and phone · @username with Edit in the nav-bar position, then opaque group cards: Change Profile Photo, Recent Calls, Devices, Notifications and Sounds, Privacy and Security, Data and Storage, Appearance |
 
 ## Architecture in one paragraph
 

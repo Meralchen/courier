@@ -98,6 +98,7 @@ internal fun TelegramEngine.handle(
             string("username"),
             result,
         )
+        "setProfilePhoto" -> setProfilePhoto(string("path"), result)
         "chatInfo" -> requestChatInfo(long("chatId"), result)
         "sessions" -> requestSessions(result)
         "terminateSession" -> terminateSession(long("sessionId"), result)

@@ -1,3 +1,4 @@
+import 'package:courier/ui/components/glass.dart';
 import 'package:courier/ui/tab_bar.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
@@ -37,6 +38,40 @@ void main() {
     await tester.tapAt(Offset(rect.left + 350, rect.center.dy));
     await tester.pumpAndSettle();
     expect(selections, <int>[0, 3]);
+  });
+
+  testWidgets('a tap glides the selection instead of snapping it', (
+    WidgetTester tester,
+  ) async {
+    final List<int> selections = await pumpBar(tester);
+    final Rect rect = tester.getRect(find.byType(CourierTabBar));
+    // The bar insets itself by 12 pt on each side before splitting slots.
+    final double left = rect.left + 12;
+    final double slot = (rect.width - 24) / 4;
+
+    // The selection is a single shape (the second GlassPanel; the first is the
+    // bar). It starts on Chats, slot 2.
+    expect(find.byType(GlassPanel), findsNWidgets(2));
+    final double restX = tester.getCenter(find.byType(GlassPanel).last).dx;
+    expect(restX, closeTo(left + 2.5 * slot, 2));
+
+    final TestGesture gesture = await tester.startGesture(
+      Offset(left + 3.5 * slot, rect.center.dy),
+    );
+    // The tap recogniser claims the gesture after kPressTimeout (100 ms); the
+    // glide starts there.
+    await tester.pump(const Duration(milliseconds: 110));
+    await tester.pump(const Duration(milliseconds: 70));
+    final double midX = tester.getCenter(find.byType(GlassPanel).last).dx;
+
+    // It has left the old tab and has not jumped to the new one: one tile
+    // travelling, not two stacked in the same slot.
+    expect(midX, greaterThan(restX + 4));
+    expect(midX, lessThan(left + 3.5 * slot - 4));
+
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(selections, <int>[3]);
   });
 
   testWidgets('a slow drag commits the tab under the finger', (
