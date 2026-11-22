@@ -7,26 +7,32 @@ implemented but not verified against live Telegram, `[ ]` not implemented.
 
 ### Flutter analyze
 
-`flutter analyze --no-pub` reports **no errors and no warnings**. The remaining
-messages are Flutter 3.50 deprecation infos for importing `material.dart` and
-`cupertino.dart` directly; they do not affect the build.
+`flutter analyze` reports **no issues**. Flutter 3.50 deprecates importing
+`package:flutter/material.dart` and `package:flutter/cupertino.dart`, so the app
+imports `package:material_ui/material_ui.dart` and
+`package:cupertino_ui/cupertino_ui.dart` instead.
 
-### Debug APK
+### APKs
 
-- `flutter build apk --debug` succeeded.
-- Artifact: `build/app/outputs/flutter-apk/app-debug.apk`, 210 MB.
-- SHA-256 `df9c4f1c338427c3bebac12c8853de17b23c110408edf7d7fdab4bfb3147d157`.
-- Inspected with `aapt`/`unzip`: package `com.courier.messenger`, version 1.0.0,
-  targetSdk 36, `INTERNET` and `ACCESS_NETWORK_STATE`, `libtdjni.so` for
-  arm64-v8a, armeabi-v7a and x86_64, and
-  `assets/flutter_assets/packages/liquiglass/shaders/liquid_glass.frag`.
+Both APKs are built by the `Flutter APKs` workflow
+(`.github/workflows/android.yml`, run #14 on `cf946bb`) and attached to the
+[`courier-latest` release](https://github.com/Meralchen/courier/releases/tag/courier-latest):
 
-### Stable APK
+- `Courier-1.0-stable.apk` — 120 MB, release build.
+- `Courier-1.0-debug.apk` — 229 MB, debug build.
+- `SHA256SUMS.txt` — checksums for the files currently attached; a rebuild
+  replaces the APKs and the sums together, so read this file rather than a
+  checksum copied into a document.
 
-- `flutter build apk --release` configured with the debug signing key because
-  this repository has no owner keystore.
-- Built by the same workflow that publishes `Courier-1.0-stable.apk`; the
-  release run link and checksum are added to the release notes after CI.
+Downloaded the published stable APK and inspected it with `aapt2`/`unzip`:
+package `com.courier.messenger`, version 1.0.0, targetSdk 36, `libtdjni.so` for
+arm64-v8a, armeabi-v7a and x86_64, and
+`assets/flutter_assets/packages/liquiglass/shaders/liquid_glass.frag`.
+
+### Signing
+
+- The stable APK uses the debug signing key because this repository has no owner
+  keystore; it installs normally but is not a Play Store upload.
 - Minification and resource shrinking are off, so TDLib's JNI classes are not
   stripped accidentally.
 
