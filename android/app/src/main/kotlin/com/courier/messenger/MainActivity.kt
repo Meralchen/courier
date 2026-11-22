@@ -1,5 +1,9 @@
 package com.courier.messenger
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import android.os.Bundle
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -14,6 +18,22 @@ import com.courier.messenger.telegram.CourierTelegramPlugin
 class MainActivity : FlutterActivity() {
     private var recorder: VoiceRecorder? = null
     private var pendingStart: MethodChannel.Result? = null
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        // Notifications are the only permission the shell needs up front; the
+        // Telegram engine silently skips them until Android grants it.
+        if (
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            requestPermissions(
+                arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                NOTIFICATIONS_REQUEST,
+            )
+        }
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -92,5 +112,6 @@ class MainActivity : FlutterActivity() {
 
     companion object {
         const val VOICE_CHANNEL = "courier/voice"
+        private const val NOTIFICATIONS_REQUEST = 7402
     }
 }

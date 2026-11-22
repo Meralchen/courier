@@ -494,6 +494,32 @@ class TelegramStore extends ChangeNotifier {
     () => _client.call('chatInfo', <String, Object?>{'chatId': chatId}),
   );
 
+  /// Creates a supergroup or channel. The chat id is returned so the caller
+  /// can open the new conversation straight away.
+  Future<int> createChat({
+    required String title,
+    required bool isChannel,
+    List<int> userIds = const <int>[],
+  }) async {
+    final int? id = await _client.invoke<int>('createChat', <String, Object?>{
+      'title': title,
+      'userIds': userIds,
+      'isChannel': isChannel,
+    });
+    if (id == null) throw TelegramException('Could not create the chat');
+    return id;
+  }
+
+  /// Global search runs in TDLib: known chats, public chats and messages.
+  /// Errors are returned to the caller so the search screen can show them
+  /// inline while keeping whatever it already had on screen.
+  Future<SearchResults> search(String query) async {
+    final Object? raw = await _client.invoke<Object?>('search', <String, Object?>{
+      'query': query,
+    });
+    return SearchResults.fromMap(asMap(raw));
+  }
+
   // --------------------------------------------------------------- profile
 
   Future<void> updateProfile({

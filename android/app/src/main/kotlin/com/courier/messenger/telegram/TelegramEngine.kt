@@ -29,6 +29,7 @@ internal class TelegramEngine(internal val emit: (Map<String, Any?>) -> Unit) {
 
     internal var client: Client? = null
     internal var appContext: Context? = null
+    internal var notifications: CourierNotifications? = null
     internal var apiId = 0
     internal var apiHash = ""
     internal var myId = 0L
@@ -48,6 +49,9 @@ internal class TelegramEngine(internal val emit: (Map<String, Any?>) -> Unit) {
 
     fun attach(context: Context) {
         appContext = context.applicationContext
+        if (notifications == null) {
+            notifications = CourierNotifications(context.applicationContext)
+        }
     }
 
     /** Creates the TDLib client once; later calls only refresh what exists. */
@@ -171,7 +175,10 @@ internal class TelegramEngine(internal val emit: (Map<String, Any?>) -> Unit) {
                 if (update.userId == myId) publishProfile()
             }
 
-            is TdApi.UpdateNewMessage -> addMessage(update.message)
+            is TdApi.UpdateNewMessage -> {
+                notifyMessage(update.message)
+                addMessage(update.message)
+            }
 
             is TdApi.UpdateMessageSendSucceeded -> {
                 replaceMessage(update.message.chatId, update.oldMessageId, update.message)

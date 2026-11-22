@@ -8,12 +8,67 @@ import '../components/avatar.dart';
 import '../components/glass.dart';
 import '../components/ios_ui.dart';
 import '../components/pressable.dart';
+import 'create_chat_screen.dart';
 
 class NewChatScreen extends StatefulWidget {
   const NewChatScreen({super.key});
 
   @override
   State<NewChatScreen> createState() => _NewChatScreenState();
+}
+
+class _CreateRow extends StatelessWidget {
+  const _CreateRow({
+    required this.icon,
+    required this.color,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final Color color;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final AppColors colors = AppColors.of(context);
+    return Pressable(
+      onTap: onTap,
+      scale: 0.99,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 10, 14, 10),
+        child: Row(
+          children: <Widget>[
+            Container(
+              width: 29,
+              height: 29,
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(7.5),
+              ),
+              child: Icon(icon, size: 17, color: Colors.white),
+            ),
+            const SizedBox(width: 11),
+            Expanded(
+              child: Text(
+                label,
+                style: AppText.body.copyWith(
+                  fontSize: 16.5,
+                  color: colors.textPrimary,
+                ),
+              ),
+            ),
+            Icon(
+              Icons.chevron_right,
+              size: 19,
+              color: colors.textTertiary,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _NewChatScreenState extends State<NewChatScreen> {
@@ -25,6 +80,15 @@ class _NewChatScreenState extends State<NewChatScreen> {
   void dispose() {
     _query.dispose();
     super.dispose();
+  }
+
+  Future<void> _create(bool channel) async {
+    final int? id = await Navigator.of(context).push<int>(
+      MaterialPageRoute<int>(
+        builder: (BuildContext _) => CreateChatScreen(channel: channel),
+      ),
+    );
+    if (id != null && mounted) Navigator.of(context).pop(id);
   }
 
   Future<void> _openUsername() async {
@@ -89,6 +153,30 @@ class _NewChatScreenState extends State<NewChatScreen> {
                     onSubmitted: (_) => _openUsername(),
                   ),
                 ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 2, 14, 0),
+                  child: GlassCard(
+                    padding: EdgeInsets.zero,
+                    radius: 16,
+                    child: Column(
+                      children: <Widget>[
+                        _CreateRow(
+                          icon: Icons.groups_2_outlined,
+                          color: colors.accent,
+                          label: 'New Group',
+                          onTap: () => _create(false),
+                        ),
+                        const Hairline(indent: 56),
+                        _CreateRow(
+                          icon: Icons.campaign_outlined,
+                          color: colors.success,
+                          label: 'New Channel',
+                          onTap: () => _create(true),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
                 if (_value.trim().isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -139,7 +227,7 @@ class _NewChatScreenState extends State<NewChatScreen> {
                   ),
                 SectionLabel(
                   needle.isEmpty ? 'People you know' : 'Results',
-                  padding: const EdgeInsets.fromLTRB(22, 16, 20, 6),
+                  padding: const EdgeInsets.fromLTRB(22, 14, 20, 6),
                 ),
                 Expanded(
                   child: contacts.isEmpty

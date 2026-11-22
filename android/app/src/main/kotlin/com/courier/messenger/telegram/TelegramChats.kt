@@ -34,6 +34,7 @@ internal fun TelegramEngine.openChat(chatId: Long) {
         client?.fire(TdApi.CloseChat(openChatId))
     }
     openChatId = chatId
+    notifications?.cancel(chatId)
     client?.fire(TdApi.OpenChat(chatId))
     val cached = messages[chatId]
     if (cached.isNullOrEmpty()) loadHistory(chatId, 0L, null)

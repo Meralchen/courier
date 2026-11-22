@@ -422,6 +422,57 @@ class Message {
   );
 }
 
+/// One message hit from TDLib's server-side search, with the chat it belongs
+/// to so the result can be shown and opened without another lookup.
+class SearchMessageHit {
+  const SearchMessageHit({
+    required this.chatId,
+    required this.chatTitle,
+    required this.message,
+  });
+
+  factory SearchMessageHit.fromMap(Map<String, Object?> m) => SearchMessageHit(
+    chatId: asInt(m['chatId']),
+    chatTitle: asString(m['chatTitle']),
+    message: Message.fromMap(asMap(m['message'])),
+  );
+
+  final int chatId;
+  final String chatTitle;
+  final Message message;
+
+  String get title => chatTitle.isNotEmpty ? chatTitle : message.sender;
+}
+
+/// The combined answer to a global search: chats already in the account, chats
+/// found on the server by title or username, and matching messages.
+class SearchResults {
+  const SearchResults({
+    this.chats = const <ChatSummary>[],
+    this.global = const <ChatSummary>[],
+    this.messages = const <SearchMessageHit>[],
+  });
+
+  factory SearchResults.fromMap(Map<String, Object?> m) => SearchResults(
+    chats: asList(
+      m['chats'],
+    ).map((Object? item) => ChatSummary.fromMap(asMap(item))).toList(),
+    global: asList(
+      m['global'],
+    ).map((Object? item) => ChatSummary.fromMap(asMap(item))).toList(),
+    messages: asList(
+      m['messages'],
+    ).map((Object? item) => SearchMessageHit.fromMap(asMap(item))).toList(),
+  );
+
+  final List<ChatSummary> chats;
+  final List<ChatSummary> global;
+  final List<SearchMessageHit> messages;
+
+  bool get isEmpty =>
+      chats.isEmpty && global.isEmpty && messages.isEmpty;
+}
+
 class Profile {
   const Profile({
     required this.id,

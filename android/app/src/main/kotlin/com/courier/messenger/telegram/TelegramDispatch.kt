@@ -139,6 +139,13 @@ internal fun TelegramEngine.handle(
         )
         "setProfilePhoto" -> setProfilePhoto(string("path"), result)
         "chatInfo" -> requestChatInfo(long("chatId"), result)
+        "search" -> searchAll(string("query"), result)
+        "createChat" -> createChat(
+            string("title"),
+            ids("userIds"),
+            bool("isChannel"),
+            result,
+        )
         "sessions" -> requestSessions(result)
         "stories" -> requestStories(result)
         "stickers" -> requestStickers(result)
