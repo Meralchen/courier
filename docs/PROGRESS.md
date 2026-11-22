@@ -148,7 +148,9 @@ and the tap target.
 - [x] Active sessions and termination.
 - [x] Cache size and clearing.
 - [x] Logout and re-login.
-- [ ] Voice notes, video, stickers, GIF.
+- [x] Sticker keyboard backed by TDLib: recent + installed sets with
+  thumbnails, sending through `InputMessageSticker`, emoji grid that types.
+- [ ] Voice notes, video, GIF search.
 - [ ] Reactions, forwarding, polls, locations.
 - [ ] Global message search.
 - [ ] Groups/channels administration, folders, archive.

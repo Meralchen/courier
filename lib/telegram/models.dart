@@ -479,3 +479,55 @@ class StoryCircle {
     order: asInt(map['order']),
   );
 }
+
+/// One sticker in the panel. [thumbnailFileId] is downloaded for the grid;
+/// [fileId] is what TDLib needs to send it.
+class StickerItem {
+  const StickerItem({
+    required this.fileId,
+    this.thumbnailFileId = 0,
+    this.thumbnailPath = '',
+    this.width = 0,
+    this.height = 0,
+    this.emoji = '',
+    this.animated = false,
+  });
+
+  final int fileId;
+  final int thumbnailFileId;
+  final String thumbnailPath;
+  final int width;
+  final int height;
+  final String emoji;
+  final bool animated;
+
+  factory StickerItem.fromMap(Map<String, Object?> map) => StickerItem(
+    fileId: asInt(map['fileId']),
+    thumbnailFileId: asInt(map['thumbnailFileId']),
+    thumbnailPath: asString(map['thumbnailPath']),
+    width: asInt(map['width']),
+    height: asInt(map['height']),
+    emoji: asString(map['emoji']),
+    animated: asBool(map['animated']),
+  );
+}
+
+class StickerPack {
+  const StickerPack({
+    required this.id,
+    required this.title,
+    required this.stickers,
+  });
+
+  final int id;
+  final String title;
+  final List<StickerItem> stickers;
+
+  factory StickerPack.fromMap(Map<String, Object?> map) => StickerPack(
+    id: asInt(map['id']),
+    title: asString(map['title']),
+    stickers: asList(
+      map['stickers'],
+    ).map((Object? item) => StickerItem.fromMap(asMap(item))).toList(),
+  );
+}

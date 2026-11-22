@@ -137,12 +137,6 @@ class _ChatListScreenState extends State<ChatListScreen> {
     final AppColors colors = AppColors.of(context);
     final List<ChatSummary> chats = store.chats;
     final List<ChatSummary> all = _visible(chats);
-    final List<ChatSummary> pinned = all
-        .where((ChatSummary chat) => chat.pinned)
-        .toList();
-    final List<ChatSummary> rest = all
-        .where((ChatSummary chat) => !chat.pinned)
-        .toList();
 
     final int unreadCount = chats
         .where((ChatSummary chat) => chat.unread > 0)
@@ -227,47 +221,17 @@ class _ChatListScreenState extends State<ChatListScreen> {
                     ),
                   ),
                 ),
-              if (pinned.isNotEmpty) ...<Widget>[
-                SliverToBoxAdapter(child: SectionLabel('Pinned')),
-                SliverList.builder(
-                  itemCount: pinned.length,
-                  itemBuilder: (BuildContext context, int index) =>
-                      _row(pinned[index]),
-                ),
-              ],
-              if (rest.isNotEmpty) ...<Widget>[
-                SliverToBoxAdapter(
-                  child: SectionLabel(_query.isEmpty ? 'All chats' : 'Results'),
-                ),
-                SliverList.builder(
-                  itemCount: rest.length,
-                  itemBuilder: (BuildContext context, int index) =>
-                      _row(rest[index]),
-                ),
-              ],
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 130),
-                  child: Text(
-                    chats.isEmpty
-                        ? ''
-                        : '${chats.length} chats · '
-                              '${store.totalUnread} unread',
-                    textAlign: TextAlign.center,
-                    style: AppText.caption.copyWith(
-                      color: colors.textSecondary,
-                    ),
-                  ),
-                ),
+              // iOS draws pinned and ordinary chats as one continuous list,
+              // with no section headers or footer, so nothing overlaps a row.
+              SliverList.builder(
+                itemCount: all.length,
+                itemBuilder: (BuildContext context, int index) =>
+                    _row(all[index]),
               ),
+              // Clears the floating tab bar so the last chat stays reachable.
+              const SliverToBoxAdapter(child: SizedBox(height: 118)),
             ],
           ),
-          if (!_editing)
-            Positioned(
-              right: 16,
-              bottom: 96,
-              child: FloatingComposeButton(onTap: _newChat),
-            ),
           if (_editing)
             Positioned(
               left: 16,

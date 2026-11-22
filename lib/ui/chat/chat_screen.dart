@@ -18,6 +18,7 @@ import 'chat_header.dart';
 import 'chat_info_screen.dart';
 import 'composer.dart';
 import 'message_actions.dart';
+import 'sticker_panel.dart';
 import 'message_bubble.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -172,6 +173,28 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       context,
     ).sendText(widget.chatId, text, replyToId: replyId);
     _scheduleJump(animate: true);
+  }
+
+  Future<void> _openStickers() async {
+    final TelegramStore store = TelegramScope.read(context);
+    await showStickerPanel(
+      context,
+      store: store,
+      onSticker: (StickerItem sticker) async {
+        await store.sendSticker(widget.chatId, sticker);
+        if (mounted) _scheduleJump(animate: true);
+      },
+      onEmoji: (String emoji) {
+        final TextEditingValue value = _draft.value;
+        final int offset = value.selection.baseOffset < 0
+            ? value.text.length
+            : value.selection.baseOffset;
+        _draft.value = TextEditingValue(
+          text: value.text.replaceRange(offset, offset, emoji),
+          selection: TextSelection.collapsed(offset: offset + emoji.length),
+        );
+      },
+    );
   }
 
   Future<void> _actions(Message message) async {
@@ -391,6 +414,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 onPickPhoto: _pickPhoto,
                 onTyping: (bool typing) =>
                     store.sendTyping(widget.chatId, typing),
+                onOpenStickers: _openStickers,
               ),
             ],
           ),

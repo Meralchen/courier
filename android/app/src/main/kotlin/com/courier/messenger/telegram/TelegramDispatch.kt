@@ -102,6 +102,15 @@ internal fun TelegramEngine.handle(
         "chatInfo" -> requestChatInfo(long("chatId"), result)
         "sessions" -> requestSessions(result)
         "stories" -> requestStories(result)
+        "stickers" -> requestStickers(result)
+        "sendSticker" -> sendSticker(
+            long("chatId"),
+            int("fileId"),
+            string("emoji"),
+            int("width"),
+            int("height"),
+            result,
+        )
         "savedMessages" -> openSavedMessages(result)
         "terminateSession" -> terminateSession(long("sessionId"), result)
         "storage" -> requestStorage(result)

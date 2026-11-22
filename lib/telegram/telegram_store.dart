@@ -39,6 +39,9 @@ class TelegramStore extends ChangeNotifier {
   /// it, so screens showing only the list are not rebuilt for them.
   int chatsVersion = 0;
 
+  List<StickerItem> recentStickers = const <StickerItem>[];
+  List<StickerPack> stickerPacks = const <StickerPack>[];
+
   final List<StoryCircle> stories = <StoryCircle>[];
   int storiesVersion = 0;
   bool _storiesRequested = false;
@@ -224,6 +227,8 @@ class TelegramStore extends ChangeNotifier {
         final ChatInfo info = ChatInfo.fromMap(asMap(event['info']));
         _chatInfos[info.chatId] = info;
         _notify();
+      case 'stickers':
+        _applyStickers(asMap(event['stickers']));
       case 'stories':
         _applyStories(asList(event['stories']));
       case 'storage':
@@ -437,6 +442,36 @@ class TelegramStore extends ChangeNotifier {
   /// and the `profile` update follows, so the header refreshes without a poll.
   Future<void> setProfilePhoto(String path) => _guard(
     () => _client.call('setProfilePhoto', <String, Object?>{'path': path}),
+  );
+
+  void _applyStickers(Map<String, Object?> payload) {
+    recentStickers = asList(
+      payload['recent'],
+    ).map((Object? item) => StickerItem.fromMap(asMap(item))).toList();
+    stickerPacks = asList(
+      payload['sets'],
+    ).map((Object? item) => StickerPack.fromMap(asMap(item))).toList();
+    _notify();
+  }
+
+  /// Loads the panel's stickers once; TDLib caches the answer.
+  Future<void> loadStickers() async {
+    try {
+      final Object? raw = await _client.invoke<Object?>('stickers');
+      if (raw is Map) _applyStickers(asMap(raw));
+    } catch (_) {
+      // The panel stays on its emoji tab if stickers cannot be loaded.
+    }
+  }
+
+  Future<void> sendSticker(int chatId, StickerItem sticker) => _guard(
+    () => _client.call('sendSticker', <String, Object?>{
+      'chatId': chatId,
+      'fileId': sticker.fileId,
+      'emoji': sticker.emoji,
+      'width': sticker.width,
+      'height': sticker.height,
+    }),
   );
 
   Future<int?> openSavedMessages() async {

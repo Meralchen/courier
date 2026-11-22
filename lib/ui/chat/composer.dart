@@ -18,6 +18,7 @@ class Composer extends StatefulWidget {
     required this.onPickPhoto,
     required this.onTyping,
     this.sendingPhoto = false,
+    this.onOpenStickers,
   });
 
   final TextEditingController controller;
@@ -27,6 +28,10 @@ class Composer extends StatefulWidget {
   final VoidCallback onPickPhoto;
   final ValueChanged<bool> onTyping;
   final bool sendingPhoto;
+
+  /// Opens the sticker keyboard. Falls back to the built-in emoji sheet when a
+  /// caller does not provide one.
+  final Future<void> Function()? onOpenStickers;
 
   @override
   State<Composer> createState() => _ComposerState();
@@ -72,9 +77,30 @@ class _ComposerState extends State<Composer> {
 
   Future<void> _emojiGrid() async {
     const List<String> emoji = <String>[
-      '😀', '😂', '🥹', '😍', '😘', '😎', '🤔', '😴',
-      '👍', '👏', '🙏', '💪', '🔥', '💙', '🎉', '✨',
-      '❤️', '😭', '😅', '🤯', '🥳', '😇', '🤝', '👀',
+      '😀',
+      '😂',
+      '🥹',
+      '😍',
+      '😘',
+      '😎',
+      '🤔',
+      '😴',
+      '👍',
+      '👏',
+      '🙏',
+      '💪',
+      '🔥',
+      '💙',
+      '🎉',
+      '✨',
+      '❤️',
+      '😭',
+      '😅',
+      '🤯',
+      '🥳',
+      '😇',
+      '🤝',
+      '👀',
     ];
     final String? picked = await showModalBottomSheet<String>(
       context: context,
@@ -165,8 +191,8 @@ class _ComposerState extends State<Composer> {
                             widget.replyTo!.outgoing
                                 ? 'Reply to yourself'
                                 : (widget.replyTo!.sender.isEmpty
-                                    ? 'Reply'
-                                    : widget.replyTo!.sender),
+                                      ? 'Reply'
+                                      : widget.replyTo!.sender),
                             style: AppText.caption.copyWith(
                               color: colors.accent,
                               fontWeight: FontWeight.w600,
@@ -185,7 +211,11 @@ class _ComposerState extends State<Composer> {
                     ),
                     IconButton(
                       onPressed: widget.onCancelReply,
-                      icon: Icon(Icons.close, size: 17, color: colors.textSecondary),
+                      icon: Icon(
+                        Icons.close,
+                        size: 17,
+                        color: colors.textSecondary,
+                      ),
                     ),
                   ],
                 ),
@@ -262,7 +292,11 @@ class _ComposerState extends State<Composer> {
                         ),
                         IconButton(
                           visualDensity: VisualDensity.compact,
-                          onPressed: _emojiGrid,
+                          onPressed: widget.onOpenStickers == null
+                              ? _emojiGrid
+                              : () {
+                                  widget.onOpenStickers!();
+                                },
                           icon: Icon(
                             Icons.emoji_emotions_outlined,
                             color: colors.textSecondary,
@@ -284,12 +318,12 @@ class _ComposerState extends State<Composer> {
                               _send();
                             }
                           : () => ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Voice messages are not part of this build yet.',
-                                  ),
+                              const SnackBar(
+                                content: Text(
+                                  'Voice messages are not part of this build yet.',
                                 ),
                               ),
+                            ),
                       child: AnimatedContainer(
                         duration: Motion.fast,
                         width: 38,

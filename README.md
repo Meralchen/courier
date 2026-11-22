@@ -47,6 +47,9 @@ smaller than the old build because of R8.
 **Telegram**
 - Phone-number login, login code and optional 2FA password, with clear per-step
   errors. The session survives restarts through TDLib's local database.
+- The iOS sticker keyboard: recent stickers and the installed sets from
+  TDLib, sent as real stickers through `SendMessage`/`InputMessageSticker`,
+  plus an emoji grid that types into the draft.
 - Live chat list with pinned chats, unread badges, muted chats, last-message
   previews, relative timestamps, online/typing state and chat photos.
 - The current iOS chats bar: Edit pill, centred title, compose, search field

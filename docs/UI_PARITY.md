@@ -75,6 +75,16 @@ still lays out correctly.
   background in the shell and conversation, with no shader and no backdrop
   filter.
 
+## Sticker keyboard
+
+The composer's emoji button opens the panel iOS shows above it: a segmented
+Stickers/Emoji switch, the account's recent stickers, then the first installed
+regular sets with thumbnail grids. Stickers are sent with TDLib's
+`InputMessageSticker` (the current API; there is no `SendSticker` request in
+this TDLib), and the Emoji tab inserts into the draft at the caret. The panel
+opens immediately and fills from `GetRecentStickers`/`GetInstalledStickerSets`
++ `GetStickerSet`; while a thumbnail downloads the sticker's own emoji stands in.
+
 ## Chats, Contacts and the tab bar
 
 - Chats uses the current iOS bar: a grey Edit pill, centred 17 pt title, compose
