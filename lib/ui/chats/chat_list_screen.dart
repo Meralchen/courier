@@ -9,9 +9,14 @@ import '../../telegram/models.dart';
 import '../../telegram/telegram_store.dart';
 import '../chat/chat_screen.dart';
 import '../components/ios_ui.dart';
+import '../components/pressable.dart';
+import '../components/sheets.dart';
 import 'chat_row.dart';
-import 'stories_row.dart';
 import 'new_chat_screen.dart';
+import 'stories_row.dart';
+
+/// The chat-list filter chips iOS shows under the search field.
+enum ChatFilter { all, unread, groups, private }
 
 class ChatListScreen extends StatefulWidget {
   const ChatListScreen({super.key});
@@ -24,6 +29,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
   final TextEditingController _search = TextEditingController();
   final FocusNode _searchFocus = FocusNode();
   String _query = '';
+  ChatFilter _filter = ChatFilter.all;
+  bool _editing = false;
+  final Set<int> _selected = <int>{};
 
   @override
   void dispose() {
@@ -32,16 +40,62 @@ class _ChatListScreenState extends State<ChatListScreen> {
     super.dispose();
   }
 
-  List<ChatSummary> _filtered(List<ChatSummary> source) {
-    if (_query.trim().isEmpty) return source;
-    final String needle = _query.toLowerCase();
-    return source
+  static bool _isGroup(ChatSummary chat) => chat.isGroup || !chat.isPrivate;
+
+  List<ChatSummary> _visible(List<ChatSummary> source) {
+    final List<ChatSummary> filtered = switch (_filter) {
+      ChatFilter.all => source,
+      ChatFilter.unread =>
+        source.where((ChatSummary chat) => chat.unread > 0).toList(),
+      ChatFilter.groups => source.where(_isGroup).toList(),
+      ChatFilter.private =>
+        source.where((ChatSummary chat) => chat.isPrivate).toList(),
+    };
+    final String needle = _query.trim().toLowerCase();
+    if (needle.isEmpty) return filtered;
+    return filtered
         .where(
           (ChatSummary chat) =>
               chat.title.toLowerCase().contains(needle) ||
               chat.preview.toLowerCase().contains(needle),
         )
         .toList();
+  }
+
+  void _toggleEdit() {
+    setState(() {
+      _editing = !_editing;
+      _selected.clear();
+    });
+  }
+
+  void _toggleSelect(int id) {
+    setState(() {
+      if (!_selected.add(id)) _selected.remove(id);
+    });
+  }
+
+  Future<void> _deleteSelected(TelegramStore store) async {
+    if (_selected.isEmpty) return;
+    final bool confirmed = await showGlassConfirm(
+      context,
+      title:
+          'Delete ${_selected.length} chat'
+          '${_selected.length == 1 ? '' : 's'}?',
+      message: 'The chats and their history will be removed for you.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    );
+    if (!confirmed) return;
+    final List<int> ids = _selected.toList();
+    for (final int id in ids) {
+      await store.deleteChat(id);
+    }
+    if (!mounted) return;
+    setState(() {
+      _selected.clear();
+      _editing = false;
+    });
   }
 
   Future<void> _newChat() async {
@@ -59,6 +113,15 @@ class _ChatListScreenState extends State<ChatListScreen> {
     }
   }
 
+  Widget _row(ChatSummary chat) {
+    return ChatRow(
+      chat: chat,
+      selecting: _editing,
+      selected: _selected.contains(chat.id),
+      onTap: _editing ? () => _toggleSelect(chat.id) : null,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final TelegramStore store = TelegramScope.read(context);
@@ -72,13 +135,31 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
   Widget _build(BuildContext context, TelegramStore store) {
     final AppColors colors = AppColors.of(context);
-    final List<ChatSummary> all = _filtered(store.chats);
+    final List<ChatSummary> chats = store.chats;
+    final List<ChatSummary> all = _visible(chats);
     final List<ChatSummary> pinned = all
         .where((ChatSummary chat) => chat.pinned)
         .toList();
     final List<ChatSummary> rest = all
         .where((ChatSummary chat) => !chat.pinned)
         .toList();
+
+    final int unreadCount = chats
+        .where((ChatSummary chat) => chat.unread > 0)
+        .length;
+    final int groupCount = chats.where(_isGroup).length;
+    final int privateCount = chats
+        .where((ChatSummary chat) => chat.isPrivate)
+        .length;
+
+    final String emptyTitle = _query.trim().isNotEmpty
+        ? 'No results'
+        : switch (_filter) {
+            ChatFilter.all => 'No chats yet',
+            ChatFilter.unread => 'Nothing unread',
+            ChatFilter.groups => 'No groups yet',
+            ChatFilter.private => 'No private chats yet',
+          };
 
     return SafeArea(
       bottom: false,
@@ -103,11 +184,18 @@ class _ChatListScreenState extends State<ChatListScreen> {
                   query: _query,
                   onChanged: (String value) => setState(() => _query = value),
                   colors: colors,
-                  connection: store.connection,
+                  filter: _filter,
+                  onFilter: (ChatFilter value) =>
+                      setState(() => _filter = value),
+                  unreadCount: unreadCount,
+                  groupCount: groupCount,
+                  privateCount: privateCount,
+                  editing: _editing,
+                  onEdit: _toggleEdit,
                   onCompose: _newChat,
                 ),
               ),
-              if (store.stories.isNotEmpty)
+              if (store.stories.isNotEmpty && !_editing)
                 SliverToBoxAdapter(
                   child: StoriesRow(
                     stories: store.stories,
@@ -123,21 +211,19 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 SliverFillRemaining(
                   hasScrollBody: false,
                   child: Padding(
-                    padding: const EdgeInsets.only(bottom: 90),
+                    padding: const EdgeInsets.only(bottom: 120),
                     child: EmptyState(
-                      icon: store.chats.isEmpty
+                      icon: chats.isEmpty
                           ? Icons.chat_bubble_outline
                           : Icons.search_off,
-                      title: store.chats.isEmpty
-                          ? 'No chats yet'
-                          : 'No results',
-                      message: store.chats.isEmpty
+                      title: emptyTitle,
+                      message: chats.isEmpty
                           ? (store.connection == 'Connected'
                                 ? 'Start a conversation from Contacts or tap the '
                                       'compose button. Chats appear here as TDLib '
                                       'syncs them.'
                                 : 'Telegram is connecting. Pull down to retry.')
-                          : 'Try a different name or message.',
+                          : 'Try another filter or search term.',
                     ),
                   ),
                 ),
@@ -146,7 +232,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 SliverList.builder(
                   itemCount: pinned.length,
                   itemBuilder: (BuildContext context, int index) =>
-                      ChatRow(chat: pinned[index]),
+                      _row(pinned[index]),
                 ),
               ],
               if (rest.isNotEmpty) ...<Widget>[
@@ -156,16 +242,16 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 SliverList.builder(
                   itemCount: rest.length,
                   itemBuilder: (BuildContext context, int index) =>
-                      ChatRow(chat: rest[index]),
+                      _row(rest[index]),
                 ),
               ],
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(20, 14, 20, 130),
                   child: Text(
-                    store.chats.isEmpty
+                    chats.isEmpty
                         ? ''
-                        : '${store.chats.length} chats · '
+                        : '${chats.length} chats · '
                               '${store.totalUnread} unread',
                     textAlign: TextAlign.center,
                     style: AppText.caption.copyWith(
@@ -176,10 +262,86 @@ class _ChatListScreenState extends State<ChatListScreen> {
               ),
             ],
           ),
-          Positioned(
-            right: 16,
-            bottom: 96,
-            child: FloatingComposeButton(onTap: _newChat),
+          if (!_editing)
+            Positioned(
+              right: 16,
+              bottom: 96,
+              child: FloatingComposeButton(onTap: _newChat),
+            ),
+          if (_editing)
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: 96,
+              child: _EditBar(
+                count: _selected.length,
+                onDelete: _selected.isEmpty
+                    ? null
+                    : () => _deleteSelected(store),
+                onDone: _toggleEdit,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EditBar extends StatelessWidget {
+  const _EditBar({
+    required this.count,
+    required this.onDelete,
+    required this.onDone,
+  });
+
+  final int count;
+  final VoidCallback? onDelete;
+  final VoidCallback onDone;
+
+  @override
+  Widget build(BuildContext context) {
+    final AppColors colors = AppColors.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+      decoration: BoxDecoration(
+        color: colors.cardElevated,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.18),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Row(
+        children: <Widget>[
+          Expanded(
+            child: Text(
+              count == 0 ? 'Select chats' : '$count selected',
+              style: AppText.subhead.copyWith(color: colors.textPrimary),
+            ),
+          ),
+          Pressable(
+            onTap: onDelete,
+            child: Text(
+              'Delete',
+              style: AppText.subhead.copyWith(
+                color: onDelete == null ? colors.textTertiary : colors.danger,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          const SizedBox(width: 20),
+          Pressable(
+            onTap: onDone,
+            child: Text(
+              'Done',
+              style: AppText.subhead.copyWith(
+                color: colors.accent,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),
@@ -187,8 +349,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
   }
 }
 
-/// Telegram-iOS chats header: the 34 pt title collapses into a centred nav-bar
-/// title over real glass while the search field stays put.
+/// Telegram-iOS chats bar: grey Edit pill, centred title, compose on the right,
+/// the search field under it and the filter chips under that.
 class _ChatsHeader extends SliverPersistentHeaderDelegate {
   _ChatsHeader({
     required this.controller,
@@ -196,7 +358,13 @@ class _ChatsHeader extends SliverPersistentHeaderDelegate {
     required this.query,
     required this.onChanged,
     required this.colors,
-    required this.connection,
+    required this.filter,
+    required this.onFilter,
+    required this.unreadCount,
+    required this.groupCount,
+    required this.privateCount,
+    required this.editing,
+    required this.onEdit,
     required this.onCompose,
   });
 
@@ -205,17 +373,22 @@ class _ChatsHeader extends SliverPersistentHeaderDelegate {
   final String query;
   final ValueChanged<String> onChanged;
   final AppColors colors;
-  final String connection;
+  final ChatFilter filter;
+  final ValueChanged<ChatFilter> onFilter;
+  final int unreadCount;
+  final int groupCount;
+  final int privateCount;
+  final bool editing;
+  final VoidCallback onEdit;
   final VoidCallback onCompose;
 
-  static const double _collapsed = 104;
-  static const double _expanded = 152;
+  static const double _height = 136;
 
   @override
-  double get minExtent => _collapsed;
+  double get minExtent => _height;
 
   @override
-  double get maxExtent => _expanded;
+  double get maxExtent => _height;
 
   @override
   Widget build(
@@ -223,8 +396,6 @@ class _ChatsHeader extends SliverPersistentHeaderDelegate {
     double shrinkOffset,
     bool overlapsContent,
   ) {
-    final double t = (shrinkOffset / (_expanded - _collapsed)).clamp(0.0, 1.0);
-    final bool online = connection == 'Connected' || connection == 'Updating';
     return ClipRect(
       child: Stack(
         children: <Widget>[
@@ -232,109 +403,107 @@ class _ChatsHeader extends SliverPersistentHeaderDelegate {
             child: GlassSurface(
               radius: 0,
               dark: colors.dark,
-              // Fixed, not interpolated with the scroll offset: changing the
-              // tint or materialisation every frame re-runs the shader and
-              // re-rasterises the whole pinned header while you scroll. Only
-              // the title cross-fade animates now.
               tintAmount: 46,
               light: const Offset(0, -1),
               materialize: 0.8,
               child: const SizedBox.expand(),
             ),
           ),
-          Positioned(
-            left: 18,
-            right: 12,
-            top: 6,
-            height: 46,
-            child: Row(
-              children: <Widget>[
-                Expanded(
-                  child: Stack(
-                    alignment: Alignment.centerLeft,
+          Column(
+            children: <Widget>[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(10, 2, 6, 0),
+                child: SizedBox(
+                  height: 44,
+                  child: Row(
                     children: <Widget>[
-                      Opacity(
-                        opacity: (1 - t * 1.3).clamp(0.0, 1.0),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: <Widget>[
-                            Text(
-                              'Chats',
-                              style: AppText.largeTitle.copyWith(
-                                color: colors.textPrimary,
-                                fontSize: 34 - 3 * t,
-                              ),
-                            ),
-                            if (!online) ...<Widget>[
-                              const SizedBox(width: 8),
-                              Container(
-                                width: 6,
-                                height: 6,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: connection.contains('network')
-                                      ? colors.danger
-                                      : colors.textTertiary,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                      Align(
-                        alignment: Alignment.center,
-                        child: Opacity(
-                          opacity: t,
+                      NavPill(label: editing ? 'Done' : 'Edit', onTap: onEdit),
+                      Expanded(
+                        child: Center(
                           child: Text(
                             'Chats',
                             style: AppText.title.copyWith(
                               color: colors.textPrimary,
+                              fontSize: 17,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ),
                       ),
+                      NavIconButton(
+                        icon: Icons.edit_outlined,
+                        size: 21,
+                        tooltip: 'New message',
+                        onTap: onCompose,
+                      ),
                     ],
                   ),
                 ),
-                NavIconButton(
-                  icon: Icons.search,
-                  size: 21,
-                  tooltip: 'Search',
-                  onTap: () => focusNode.requestFocus(),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 2, 14, 0),
+                child: SizedBox(
+                  height: 40,
+                  child: IosSearchField(
+                    controller: controller,
+                    focusNode: focusNode,
+                    hint: 'Search',
+                    onChanged: onChanged,
+                    trailing: query.isEmpty
+                        ? null
+                        : IconButton(
+                            onPressed: () {
+                              controller.clear();
+                              onChanged('');
+                            },
+                            icon: Icon(
+                              Icons.close,
+                              size: 17,
+                              color: colors.textSecondary,
+                            ),
+                          ),
+                  ),
                 ),
-                NavIconButton(
-                  icon: Icons.edit_outlined,
-                  size: 21,
-                  tooltip: 'New message',
-                  onTap: onCompose,
-                ),
-              ],
-            ),
-          ),
-          Positioned(
-            left: 14,
-            right: 14,
-            bottom: 11,
-            height: 40,
-            child: IosSearchField(
-              controller: controller,
-              focusNode: focusNode,
-              hint: 'Search for messages or users',
-              onChanged: onChanged,
-              trailing: query.isEmpty
-                  ? null
-                  : IconButton(
-                      onPressed: () {
-                        controller.clear();
-                        onChanged('');
-                      },
-                      icon: Icon(
-                        Icons.close,
-                        size: 17,
-                        color: colors.textSecondary,
-                      ),
+              ),
+              const SizedBox(height: 7),
+              SizedBox(
+                height: 34,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  children: <Widget>[
+                    _FilterChip(
+                      label: 'All',
+                      selected: filter == ChatFilter.all,
+                      onTap: () => onFilter(ChatFilter.all),
+                      colors: colors,
                     ),
-            ),
+                    _FilterChip(
+                      label: 'Unread',
+                      count: unreadCount,
+                      selected: filter == ChatFilter.unread,
+                      onTap: () => onFilter(ChatFilter.unread),
+                      colors: colors,
+                    ),
+                    _FilterChip(
+                      label: 'Groups',
+                      count: groupCount,
+                      selected: filter == ChatFilter.groups,
+                      onTap: () => onFilter(ChatFilter.groups),
+                      colors: colors,
+                    ),
+                    _FilterChip(
+                      label: 'Private',
+                      count: privateCount,
+                      selected: filter == ChatFilter.private,
+                      onTap: () => onFilter(ChatFilter.private),
+                      colors: colors,
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
           Positioned(
             left: 0,
@@ -350,9 +519,93 @@ class _ChatsHeader extends SliverPersistentHeaderDelegate {
   @override
   bool shouldRebuild(covariant _ChatsHeader oldDelegate) =>
       oldDelegate.query != query ||
+      oldDelegate.filter != filter ||
+      oldDelegate.editing != editing ||
+      oldDelegate.unreadCount != unreadCount ||
+      oldDelegate.groupCount != groupCount ||
+      oldDelegate.privateCount != privateCount ||
       oldDelegate.colors.dark != colors.dark ||
-      oldDelegate.connection != connection ||
       oldDelegate.controller != controller;
+}
+
+class _FilterChip extends StatelessWidget {
+  const _FilterChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    required this.colors,
+    this.count = 0,
+  });
+
+  final String label;
+  final int count;
+  final bool selected;
+  final VoidCallback onTap;
+  final AppColors colors;
+
+  @override
+  Widget build(BuildContext context) {
+    return Pressable(
+      onTap: onTap,
+      scale: 0.95,
+      child: Container(
+        margin: const EdgeInsets.only(right: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 13),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected
+              ? (colors.dark
+                    ? Colors.white.withValues(alpha: 0.16)
+                    : Colors.white)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(17),
+          boxShadow: selected && !colors.dark
+              ? <BoxShadow>[
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.06),
+                    blurRadius: 4,
+                    offset: const Offset(0, 1),
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 14.5,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                color: selected ? colors.textPrimary : colors.textSecondary,
+              ),
+            ),
+            if (count > 0) ...<Widget>[
+              const SizedBox(width: 6),
+              Container(
+                constraints: const BoxConstraints(minWidth: 18),
+                height: 18,
+                padding: const EdgeInsets.symmetric(horizontal: 5),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: colors.accent,
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: Text(
+                  '$count',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class FloatingComposeButton extends StatelessWidget {

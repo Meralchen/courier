@@ -4,7 +4,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 
 void main() {
-  Future<List<int>> pumpBar(WidgetTester tester) async {
+  Future<List<int>> pumpBar(
+    WidgetTester tester, {
+    VoidCallback? onSearch,
+  }) async {
     final List<int> selections = <int>[];
     await tester.pumpWidget(
       MaterialApp(
@@ -16,6 +19,7 @@ void main() {
                 selected: 2,
                 unread: 3,
                 onSelect: selections.add,
+                onSearch: onSearch,
               ),
             ),
           ),
@@ -74,6 +78,27 @@ void main() {
     expect(selections, <int>[3]);
   });
 
+  testWidgets('the trailing search accessory does not disturb the tabs', (
+    WidgetTester tester,
+  ) async {
+    bool searched = false;
+    final List<int> selections = await pumpBar(
+      tester,
+      onSearch: () => searched = true,
+    );
+    final Rect rect = tester.getRect(find.byType(CourierTabBar));
+
+    await tester.tap(find.byIcon(Icons.search));
+    await tester.pumpAndSettle();
+    expect(searched, isTrue);
+    expect(selections, isEmpty);
+
+    // The four tabs still own their slots next to the accessory.
+    await tester.tapAt(Offset(rect.left + 12 + 40, rect.center.dy));
+    await tester.pumpAndSettle();
+    expect(selections, <int>[0]);
+  });
+
   testWidgets('a slow drag commits the tab under the finger', (
     WidgetTester tester,
   ) async {
@@ -82,8 +107,9 @@ void main() {
     final double y = rect.center.dy;
 
     // Start on Chats (slot 2, centre 250), drag left into Calls (slot 1).
-    final TestGesture gesture =
-        await tester.startGesture(Offset(rect.left + 250, y));
+    final TestGesture gesture = await tester.startGesture(
+      Offset(rect.left + 250, y),
+    );
     await tester.pump(const Duration(milliseconds: 80));
     for (int i = 0; i < 3; i++) {
       await gesture.moveBy(const Offset(-30, 0));
@@ -102,11 +128,7 @@ void main() {
   ) async {
     final List<int> selections = await pumpBar(tester);
 
-    await tester.fling(
-      find.byType(CourierTabBar),
-      const Offset(-120, 0),
-      1200,
-    );
+    await tester.fling(find.byType(CourierTabBar), const Offset(-120, 0), 1200);
     await tester.pumpAndSettle();
 
     // The throw carries past the finger's own slot rather than snapping back.

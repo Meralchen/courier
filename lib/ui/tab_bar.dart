@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 import '../core/motion.dart';
 import '../core/theme.dart';
 import 'components/glass.dart';
+import 'components/pressable.dart';
 
 /// Telegram-iOS / liquidglass tab bar.
 ///
@@ -23,11 +24,15 @@ class CourierTabBar extends StatefulWidget {
     required this.selected,
     required this.onSelect,
     required this.unread,
+    this.onSearch,
   });
 
   final int selected;
   final ValueChanged<int> onSelect;
   final int unread;
+
+  /// The search accessory iOS puts at the trailing edge of the bar.
+  final VoidCallback? onSearch;
 
   @override
   State<CourierTabBar> createState() => _CourierTabBarState();
@@ -55,6 +60,7 @@ class _CourierTabBarState extends State<CourierTabBar>
   static const double _lensOverflow = 4;
   static const double _lensExtraWidth = 16;
   static const double _flingVelocity = 550;
+  static const double _searchSlot = 48;
 
   /// Fractional tab the lens sits on, so it can rest between slots mid-drag.
   late final AnimationController _slide = AnimationController.unbounded(
@@ -199,7 +205,9 @@ class _CourierTabBarState extends State<CourierTabBar>
       ),
       child: LayoutBuilder(
         builder: (BuildContext context, BoxConstraints constraints) {
-          _slot = constraints.maxWidth / _tabs.length;
+          final double searchWidth = widget.onSearch == null ? 0 : _searchSlot;
+          final double tabsWidth = constraints.maxWidth - searchWidth;
+          _slot = tabsWidth / _tabs.length;
           return SizedBox(
             height: _barHeight + 2 * _lensOverflow + 6,
             child: GestureDetector(
@@ -316,7 +324,7 @@ class _CourierTabBarState extends State<CourierTabBar>
                       // Tabs, above the lens, the one under it magnified.
                       Positioned(
                         left: 0,
-                        right: 0,
+                        width: tabsWidth,
                         top: barTop,
                         height: _barHeight,
                         child: Row(
@@ -345,6 +353,28 @@ class _CourierTabBarState extends State<CourierTabBar>
                           ],
                         ),
                       ),
+                      if (widget.onSearch != null)
+                        Positioned(
+                          right: 2,
+                          width: _searchSlot,
+                          top: barTop,
+                          height: _barHeight,
+                          child: Semantics(
+                            button: true,
+                            label: 'Search',
+                            child: Pressable(
+                              onTap: widget.onSearch,
+                              scale: 0.9,
+                              child: Center(
+                                child: Icon(
+                                  Icons.search,
+                                  size: 22,
+                                  color: colors.textPrimary,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
                     ],
                   );
                 },

@@ -1,3 +1,4 @@
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../core/theme.dart';
@@ -8,6 +9,7 @@ import 'calls/calls_screen.dart';
 import 'chats/chat_list_screen.dart';
 import 'components/glass.dart';
 import 'contacts/contacts_screen.dart';
+import 'search/search_screen.dart';
 import 'settings/settings_screen.dart';
 import 'shell_scope.dart';
 import 'tab_bar.dart';
@@ -49,6 +51,14 @@ class MainShellState extends State<MainShell> {
   void dispose() {
     _store?.removeListener(_onStoreChanged);
     super.dispose();
+  }
+
+  void _openSearch() {
+    Navigator.of(context).push(
+      CupertinoPageRoute<void>(
+        builder: (BuildContext _) => const SearchScreen(),
+      ),
+    );
   }
 
   void _showPendingError(TelegramStore store) {
@@ -117,6 +127,7 @@ class MainShellState extends State<MainShell> {
                   selected: _tab,
                   unread: unread,
                   onSelect: goToTab,
+                  onSearch: _openSearch,
                 ),
               ),
             ),

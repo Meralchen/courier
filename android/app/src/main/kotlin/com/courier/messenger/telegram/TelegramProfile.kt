@@ -67,6 +67,30 @@ internal fun TelegramEngine.setProfilePhoto(path: String, result: MethodChannel.
     }
 }
 
+internal fun TelegramEngine.openSavedMessages(result: MethodChannel.Result) {
+    val c = client ?: run {
+        result.error("tdlib", "TDLib is not running", null)
+        return
+    }
+    val me = myId
+    if (me == 0L) {
+        result.error("tdlib", "Profile is not loaded yet", null)
+        return
+    }
+    c.send(TdApi.CreatePrivateChat(me, false)) { chat ->
+        main.post {
+            when (chat) {
+                is TdApi.Chat -> {
+                    chats[chat.id] = chat
+                    result.success(chat.id)
+                }
+                is TdApi.Error -> result.error("tdlib", chat.message, null)
+                else -> result.error("tdlib", "Could not open Saved Messages", null)
+            }
+        }
+    }
+}
+
 internal fun TelegramEngine.requestChatInfo(chatId: Long, result: MethodChannel.Result) {
     val chat = chats[chatId] ?: run {
         result.error("tdlib", "Chat is not loaded yet", null)

@@ -439,6 +439,16 @@ class TelegramStore extends ChangeNotifier {
     () => _client.call('setProfilePhoto', <String, Object?>{'path': path}),
   );
 
+  Future<int?> openSavedMessages() async {
+    try {
+      return await _client.invoke<int>('savedMessages');
+    } catch (error) {
+      lastError = error.toString();
+      _notify();
+      return null;
+    }
+  }
+
   Future<void> loadSessions() async {
     try {
       final List<Object?>? raw = await _client.invoke<List<Object?>>(

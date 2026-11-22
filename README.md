@@ -49,6 +49,10 @@ smaller than the old build because of R8.
   errors. The session survives restarts through TDLib's local database.
 - Live chat list with pinned chats, unread badges, muted chats, last-message
   previews, relative timestamps, online/typing state and chat photos.
+- The current iOS chats bar: Edit pill, centred title, compose, search field
+  under the bar and filter chips (All / Unread / Groups / Private) with counts.
+  Edit turns the list into multi-select with a Delete action.
+- A trailing magnifier in the tab bar opens global chat search.
 - Chat history with upward paging, day dividers, read receipts and an unread
   divider; opening a chat marks it read.
 - Sending text and photos from the gallery; replies, edits, deletes and copying
@@ -58,16 +62,19 @@ smaller than the old build because of R8.
   no Lottie renderer in this build.
 - Photo viewer, shared-media grid and chat info with members and actions.
 - Pin, mute, clear history and delete chat from the chat list or chat info.
-- Contacts tab derived from private chats, with alphabetical sections and search.
+- Contacts tab derived from private chats, sorted by last seen or by name (the
+  Sort pill toggles it), with search, online/last-seen subtitles and the iOS
+  nav bar.
 - Story circles above the chat list, resolved from TDLib's
   `GetChatActiveStories` and kept live by `UpdateChatActiveStories`: the ring
   sweeps blue → violet → pink while the poster has unviewed stories and turns
   grey once seen. Tapping a circle opens that chat; a full-screen story viewer
   is not built.
 - New conversation by `@username`.
-- Profile editing (first/last name, bio, username), active sessions with
-  termination, TDLib cache size and cache clearing, connection diagnostics,
-  logout and re-login.
+- Profile editing (first/last name, bio, username, photo upload), active
+  sessions with termination, TDLib cache size and cache clearing, connection
+  diagnostics, Saved Messages (via `CreatePrivateChat` on your own id), logout
+  and re-login.
 
 **Interface**
 - `liquiglass` `GlassSurface` panels with the package's real fragment shader on

@@ -75,6 +75,19 @@ still lays out correctly.
   background in the shell and conversation, with no shader and no backdrop
   filter.
 
+## Chats, Contacts and the tab bar
+
+- Chats uses the current iOS bar: a grey Edit pill, centred 17 pt title, compose
+  glyph, the search field under it, then filter chips with unread/group/private
+  counts. Edit is real multi-select: rows grow a selection circle, the list
+  becomes tappable-only, and a floating bar deletes the selection through
+  `DeleteChat`.
+- Contacts sorts by last seen by default (the screenshot's order) and the Sort
+  pill switches to A–Z sections; rows show online or the last-seen label.
+- The tab bar carries the trailing search accessory iOS shows; it sits outside
+  the four lens slots, so the selection geometry is unchanged. It opens a local
+  chat search that works from the synced list.
+
 ## Stories
 
 The strip above the chat list follows the iOS layout: 66 pt circles with a

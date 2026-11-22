@@ -13,9 +13,22 @@ import '../components/pressable.dart';
 import '../components/sheets.dart';
 
 class ChatRow extends StatelessWidget {
-  const ChatRow({super.key, required this.chat});
+  const ChatRow({
+    super.key,
+    required this.chat,
+    this.onTap,
+    this.selecting = false,
+    this.selected = false,
+  });
 
   final ChatSummary chat;
+
+  /// Overrides the tap action, used by multi-select mode.
+  final VoidCallback? onTap;
+
+  /// Edit mode shows a selection circle and suppresses the action sheet.
+  final bool selecting;
+  final bool selected;
 
   void _open(BuildContext context) {
     Navigator.of(context).push(
@@ -38,7 +51,9 @@ class ChatRow extends StatelessWidget {
         ),
         SheetAction<String>(
           label: chat.muted ? 'Unmute' : 'Mute',
-          icon: chat.muted ? Icons.volume_up_outlined : Icons.volume_off_outlined,
+          icon: chat.muted
+              ? Icons.volume_up_outlined
+              : Icons.volume_off_outlined,
           value: 'mute',
         ),
         const SheetAction<String>(
@@ -95,141 +110,158 @@ class ChatRow extends StatelessWidget {
     final bool unread = chat.unread > 0;
 
     return Pressable(
-      onTap: () => _open(context),
-      onLongPress: () => _actions(context),
+      onTap: onTap ?? () => _open(context),
+      onLongPress: selecting ? null : () => _actions(context),
       scale: 0.985,
-      child: Column(
-        children: <Widget>[
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: <Widget>[
-                Hero(
-                  tag: 'avatar-${chat.id}',
-                  child: Avatar(
-                    title: chat.title,
-                    seed: chat.id,
-                    size: 54,
-                    photoFileId: chat.photoFileId,
-                    photoPath: chat.photoPath,
-                    online: chat.online,
-                    showOnline: chat.isPrivate && chat.online,
-                  ),
-                ),
-                const SizedBox(width: 11),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Row(
-                        children: <Widget>[
-                          Flexible(
-                            child: Text(
-                              chat.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: AppText.title.copyWith(
-                                color: colors.textPrimary,
-                                fontSize: 16.5,
-                              ),
-                            ),
-                          ),
-                          if (chat.pinned) ...<Widget>[
-                            const SizedBox(width: 4),
-                            Icon(
-                              Icons.push_pin,
-                              size: 12,
-                              color: colors.textTertiary,
-                            ),
-                          ],
-                          if (chat.muted) ...<Widget>[
-                            const SizedBox(width: 4),
-                            Icon(
-                              Icons.volume_off,
-                              size: 13,
-                              color: colors.textTertiary,
-                            ),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 2),
-                      Row(
-                        children: <Widget>[
-                          if (chat.lastOutgoing) ...<Widget>[
-                            Icon(
-                              Icons.done_all,
-                              size: 14,
-                              color: colors.accent,
-                            ),
-                            const SizedBox(width: 2),
-                          ],
-                          Expanded(
-                            child: Text(
-                              preview.isEmpty ? 'No messages yet' : preview,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: AppText.subhead.copyWith(
-                                color: chat.typing
-                                    ? colors.accent
-                                    : colors.textSecondary,
-                                fontStyle: chat.typing
-                                    ? FontStyle.italic
-                                    : FontStyle.normal,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: <Widget>[
-                    Text(
-                      formatChatTime(chat.date),
-                      style: AppText.caption.copyWith(
-                        color: unread ? colors.accent : colors.textSecondary,
-                        fontSize: 12,
+      child: ColoredBox(
+        color: selected
+            ? colors.accent.withValues(alpha: 0.10)
+            : Colors.transparent,
+        child: Column(
+          children: <Widget>[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: <Widget>[
+                  if (selecting) ...<Widget>[
+                    Padding(
+                      padding: const EdgeInsets.only(right: 10),
+                      child: Icon(
+                        selected ? Icons.check_circle : Icons.circle_outlined,
+                        size: 22,
+                        color: selected ? colors.accent : colors.textTertiary,
                       ),
                     ),
-                    const SizedBox(height: 6),
-                    if (unread)
-                      Container(
-                        constraints: const BoxConstraints(minWidth: 21),
-                        height: 21,
-                        padding: const EdgeInsets.symmetric(horizontal: 6),
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: chat.muted ? colors.textTertiary : colors.accent,
-                          borderRadius: BorderRadius.circular(11),
-                        ),
-                        child: Text(
-                          chat.unread > 999 ? '999+' : '${chat.unread}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      )
-                    else if (chat.muted)
-                      Icon(
-                        Icons.notifications_off_outlined,
-                        size: 15,
-                        color: colors.textTertiary,
-                      )
-                    else
-                      const SizedBox(height: 21),
                   ],
-                ),
-              ],
+                  Hero(
+                    tag: 'avatar-${chat.id}',
+                    child: Avatar(
+                      title: chat.title,
+                      seed: chat.id,
+                      size: 54,
+                      photoFileId: chat.photoFileId,
+                      photoPath: chat.photoPath,
+                      online: chat.online,
+                      showOnline: chat.isPrivate && chat.online,
+                    ),
+                  ),
+                  const SizedBox(width: 11),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Row(
+                          children: <Widget>[
+                            Flexible(
+                              child: Text(
+                                chat.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppText.title.copyWith(
+                                  color: colors.textPrimary,
+                                  fontSize: 16.5,
+                                ),
+                              ),
+                            ),
+                            if (chat.pinned) ...<Widget>[
+                              const SizedBox(width: 4),
+                              Icon(
+                                Icons.push_pin,
+                                size: 12,
+                                color: colors.textTertiary,
+                              ),
+                            ],
+                            if (chat.muted) ...<Widget>[
+                              const SizedBox(width: 4),
+                              Icon(
+                                Icons.volume_off,
+                                size: 13,
+                                color: colors.textTertiary,
+                              ),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Row(
+                          children: <Widget>[
+                            if (chat.lastOutgoing) ...<Widget>[
+                              Icon(
+                                Icons.done_all,
+                                size: 14,
+                                color: colors.accent,
+                              ),
+                              const SizedBox(width: 2),
+                            ],
+                            Expanded(
+                              child: Text(
+                                preview.isEmpty ? 'No messages yet' : preview,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppText.subhead.copyWith(
+                                  color: chat.typing
+                                      ? colors.accent
+                                      : colors.textSecondary,
+                                  fontStyle: chat.typing
+                                      ? FontStyle.italic
+                                      : FontStyle.normal,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: <Widget>[
+                      Text(
+                        formatChatTime(chat.date),
+                        style: AppText.caption.copyWith(
+                          color: unread ? colors.accent : colors.textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      if (unread)
+                        Container(
+                          constraints: const BoxConstraints(minWidth: 21),
+                          height: 21,
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: chat.muted
+                                ? colors.textTertiary
+                                : colors.accent,
+                            borderRadius: BorderRadius.circular(11),
+                          ),
+                          child: Text(
+                            chat.unread > 999 ? '999+' : '${chat.unread}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        )
+                      else if (chat.muted)
+                        Icon(
+                          Icons.notifications_off_outlined,
+                          size: 15,
+                          color: colors.textTertiary,
+                        )
+                      else
+                        const SizedBox(height: 21),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-          const Hairline(indent: 79),
-        ],
+            const Hairline(indent: 79),
+          ],
+        ),
       ),
     );
   }

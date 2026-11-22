@@ -9,6 +9,7 @@ import '../../state/app_settings.dart';
 import '../../state/scopes.dart';
 import '../../telegram/models.dart';
 import '../../telegram/telegram_store.dart';
+import '../chat/chat_screen.dart';
 import '../components/avatar.dart';
 import '../components/ios_ui.dart';
 import '../components/pressable.dart';
@@ -158,6 +159,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 18),
           SettingsGroup(
             children: <Widget>[
+              SettingsRow(
+                label: 'Saved Messages',
+                icon: Icons.bookmark_outline,
+                iconColor: colors.accent,
+                chevron: true,
+                onTap: () async {
+                  final int? id = await store.openSavedMessages();
+                  if (id == null || !context.mounted) return;
+                  await Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (BuildContext _) => ChatScreen(chatId: id),
+                    ),
+                  );
+                },
+              ),
               SettingsRow(
                 label: 'Recent Calls',
                 icon: Icons.call_outlined,

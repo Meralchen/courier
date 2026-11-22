@@ -31,7 +31,8 @@ class SectionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     final AppColors colors = AppColors.of(context);
     return Padding(
-      padding: padding ??
+      padding:
+          padding ??
           const EdgeInsets.only(left: 26, right: 20, top: 18, bottom: 7),
       child: Text(
         text.toUpperCase(),
@@ -69,6 +70,40 @@ class SettingsGroup extends StatelessWidget {
                 children[i],
               ],
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The iOS navigation-bar capsule ("Edit", "Sortierung"): a small grey pill
+/// rather than a text button, matching Telegram's current bars.
+class NavPill extends StatelessWidget {
+  const NavPill({super.key, required this.label, this.onTap});
+
+  final String label;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final AppColors colors = AppColors.of(context);
+    return Pressable(
+      onTap: onTap,
+      scale: 0.95,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+        decoration: BoxDecoration(
+          color: colors.dark
+              ? Colors.white.withValues(alpha: 0.10)
+              : Colors.black.withValues(alpha: 0.055),
+          borderRadius: BorderRadius.circular(17),
+        ),
+        child: Text(
+          label,
+          style: AppText.subhead.copyWith(
+            fontSize: 15,
+            color: colors.textPrimary,
           ),
         ),
       ),
@@ -240,7 +275,9 @@ class SettingsRow extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       subtitle!,
-                      style: AppText.caption.copyWith(color: colors.textSecondary),
+                      style: AppText.caption.copyWith(
+                        color: colors.textSecondary,
+                      ),
                     ),
                   ],
                 ],
@@ -304,14 +341,13 @@ class SettingsToggle extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text(
-                  label,
-                  style: AppText.body.copyWith(fontSize: 16.5),
-                ),
+                Text(label, style: AppText.body.copyWith(fontSize: 16.5)),
                 if (subtitle != null)
                   Text(
                     subtitle!,
-                    style: AppText.caption.copyWith(color: colors.textSecondary),
+                    style: AppText.caption.copyWith(
+                      color: colors.textSecondary,
+                    ),
                   ),
               ],
             ),
