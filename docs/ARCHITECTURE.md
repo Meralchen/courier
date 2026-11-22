@@ -1,67 +1,92 @@
-# Courier architecture
+# Courier architecture (Flutter)
 
 ```
-MainActivity (ComponentActivity)
-└── IosTheme                     design tokens, light/dark palettes
-    └── App()                    auth gate + navigation
-        ├── SetupScreen          api_id / api_hash (my.telegram.org)
-        ├── PhoneScreen          setAuthenticationPhoneNumber
-        ├── CodeScreen           checkAuthenticationCode
-        ├── PasswordScreen       checkAuthenticationPassword
-        └── MainShell
-            ├── ChatListScreen   live chats
-            ├── ChatScreen       live history + send
-            ├── ContactsScreen   private chats by letter
-            ├── SettingsScreen   profile, session, logout
-            └── GlassTabBar      animated glass tab bar
+lib/main.dart
+└── CourierApp                         MaterialApp, themes, routes
+    └── RootGate                       splash → auth → MainShell
+        ├── AuthFlow                   phone → code → password
+        └── MainShell                  four glass tabs
+            ├── ChatListScreen         live chats, search, new chat
+            ├── ChatScreen             history, bubbles, composer, actions
+            │   └── ChatInfoScreen     members, media, chat actions
+            ├── ContactsScreen         private chats by letter
+            ├── CallsScreen            empty state (VoIP not implemented)
+            └── SettingsScreen         profile, appearance, data, sessions
 ```
 
-## Telegram layer
+## Layers
 
-`telegram/TdlibClient.kt` is the only place that touches TDLib.
+### `lib/telegram/`
 
-- One `org.drinkless.tdlib.Client` is created lazily with
-  `Client.create(updateHandler, updateExceptionHandler, defaultExceptionHandler)`.
-- TDLib calls back on its own thread; updates are folded into
-  `MutableStateFlow`s (`auth`, `chats`, `messages`, `profile`, `connection`,
-  `activeChat`) which Compose collects with `collectAsState()`.
-- Caches: `ConcurrentHashMap` for chats, users and message lists. TDLib objects
-  are mutable Java beans, so updates patch cached objects in place.
-- Login: `UpdateAuthorizationState` drives the state machine; the app answers
-  `waitTdlibParameters` automatically, then renders one screen per stage.
-- Reads: `getChats`/`loadChats` fill the main list; `getChatHistory(0, 0, 60)`
-  loads the newest 60 messages, `viewMessages` marks the chat read.
-- Writes: `sendMessage(chatId, topic=null, replyTo=null, options=null,
-  markup=null, InputMessageText)`. `updateMessageSendSucceeded` replaces the
-  pending bubble with the server message.
+- `telegram_client.dart` wraps the two platform channels:
+  `courier/telegram` for commands and `courier/telegram/events` for updates.
+- `telegram_store.dart` is the single source of truth. It owns auth state, the
+  chat map, the open chat's message list, the profile, active sessions,
+  connection state and transient errors. TDLib events are folded here.
+- `models.dart` contains immutable Dart models (`ChatSummary`, `Message`,
+  `Profile`, `ChatInfo`, `SessionInfo`), not raw TDLib objects.
 
-### Important TDLib details
+TDLib callbacks arrive on Kotlin threads; the bridge serialises them to maps and
+the Dart store applies them on the UI isolate. A message send immediately adds
+an optimistic message with a local id; the matching TDLib update replaces it.
 
-- This TDLib build names message contents `MessageText`, `MessagePhoto`, …
-  (`MessageContent` is only the base class).
-- `getChats(ChatList, limit)` has no offset in this layer; paging is done with
-  `loadChats`.
-- Optional parameters accept `null`; `FormattedText` needs an empty
-  `TextEntity[]`, not `null`.
-- TDLib owns its SQLite database in `filesDir/tdlib`; deleting it logs the
-  session out.
+### `lib/state/`
 
-## UI layer
+`AppSettings` persists appearance and notification preferences with
+`shared_preferences`; `scopes.dart` exposes the store and settings to the widget
+tree through inherited notifiers, so screens rebuild without a third-party
+state-management dependency.
 
-- `ui/theme/IosTheme.kt` holds the design tokens (colour roles, type ramp) and
-  exposes them through `LocalIos`, mirroring how the iOS client centralises its
-  presentation theme.
-- `ui/components/Components.kt` contains primitives ported from the iOS look:
-  avatars with gradients, hairlines, nav bars, ticks, glyphs drawn with Canvas.
-- `ui/components/Glass.kt` is the liquid-glass system: layered translucent
-  gradient + specular rim (`GlassPanel`), drifting blurred colour blobs
-  (`LiquidBackdrop`), glass inputs and pills.
-- `ui/App.kt` owns the two navigation axes — auth stage and (tab, open chat) —
-  and animates both with `AnimatedContent`.
+### `lib/ui/`
 
-## Why TDLib
+- `components/glass.dart` builds on `liquiglass`'s `GlassSurface` and adds
+  Courier's bar, card, field, circular button and animated wallpaper.
+- `components/ios_ui.dart` holds the iOS-like grouped list primitives, rows,
+  hairlines and section headers.
+- `components/avatar.dart`, `sheets.dart`, `photo_viewer.dart` and
+  `pressable.dart` provide the shared interactions.
+- `auth/`, `chats/`, `chat/`, `contacts/`, `calls/` and `settings/` are feature
+  folders. Chat rendering is split into header, bubbles, media, composer and
+  actions so no single file owns the whole conversation.
 
-Implementing MTProto (auth keys, DH, SRP 2FA, message encryption, updates,
-pagination) by hand is a project of its own and a security liability. TDLib is
-Telegram's official, audited implementation, so the port focuses on the part the
-iOS repository actually contributes: the interface and interaction design.
+## Android bridge
+
+```
+android/app/src/main/kotlin/com/courier/messenger/
+├── MainActivity.kt                 registers the plugin
+└── telegram/
+    ├── CourierTelegramPlugin.kt    method channel + event sink
+    ├── TelegramEngine.kt           Client lifecycle, caches, update router
+    ├── TelegramAuth.kt             authorization state machine
+    ├── TelegramChats.kt            chat list, history, sends, actions
+    ├── TelegramProfile.kt          profile, sessions, cache, privacy
+    ├── TelegramPublish.kt          outgoing message/photo construction
+    ├── TelegramDispatch.kt         channel command dispatch
+    ├── TdMapping.kt                TDLib objects → Dart maps
+    └── TdFormat.kt                 small formatting helpers
+```
+
+There is exactly one `org.drinkless.tdlib.Client`. It is created lazily with
+TDLib's update handler, and all commands run on TDLib's async callback API.
+`Client.fire { }` is the common fire-and-forget helper; calls that must return a
+value expose a Dart `Future`.
+
+### TDLib notes for this build
+
+- The AAR is `io.github.tdlib-android:core:0.1.1`; its Java API is newer than
+  many tutorials. `Sender`, `MessageTopic`, `ChatPhotoInfo` and the optional
+  parameters on `sendMessage` are used explicitly.
+- `updateNewChat`, `updateChatLastMessage`, `updateChatTitle`,
+  `updateChatReadInbox`, `updateNewMessage`, `updateMessageContent`,
+  `updateMessageSendSucceeded`/`Failed`, `updateDeleteMessages` and
+  `updateUser` drive the Dart caches.
+- `getChatHistory` pages with `fromMessageId`; `viewMessages` marks a chat read.
+- TDLib owns its SQLite database under the app's private files directory.
+  Clearing the cache removes downloaded files, not the account session.
+
+## Why Flutter + TDLib
+
+Hand-writing MTProto (DH, SRP, message encryption, update gaps) would be a
+security liability and a separate project. TDLib is Telegram's official engine,
+so Courier spends its effort on the part that makes it distinctive: the
+liquid-glass iOS-like interface and the product flows around it.

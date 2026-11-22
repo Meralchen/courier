@@ -1,15 +1,25 @@
+# Flutter / Dart
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
 *.iml
+
+# Android / Gradle
 .gradle/
 local.properties
 .idea/
 .DS_Store
-build/
 captures/
 .externalNativeBuild
 .cxx
 *.apk
 *.aab
+android/.kotlin/
 
-# Deliverable APK
+# Deliverable APKs are release assets, not repository blobs.
 !dist/
 !dist/*.apk

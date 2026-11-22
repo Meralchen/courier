@@ -1,0 +1,22 @@
+name: courier
+description: "Courier — a real Telegram client with the iOS 26 Liquid Glass interface, rewritten in Flutter."
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.9.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  liquiglass: ^1.0.0
+  shared_preferences: ^2.5.0
+  image_picker: ^1.1.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true

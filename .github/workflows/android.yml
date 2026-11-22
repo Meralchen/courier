@@ -1,8 +1,8 @@
-name: Android APK
+name: Flutter APKs
 
 on:
   push:
-    branches: [android-port, main, master]
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
@@ -10,11 +10,15 @@ permissions:
   contents: write
 
 env:
-  APK_NAME: Courier-debug.apk
+  FLUTTER_VERSION: "3.50.1"
+  STABLE_APK: Courier-1.0-stable.apk
+  DEBUG_APK: Courier-1.0-debug.apk
 
 jobs:
   build:
+    name: Build stable and debug
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -25,53 +29,79 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Locate the preinstalled Android SDK
-        run: |
-          echo "ANDROID_HOME=${ANDROID_HOME}"
-          echo "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT}"
-          ls "${ANDROID_HOME}/platforms" || true
-          echo "sdk.dir=${ANDROID_HOME}" > local.properties
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
 
-      - name: Make Gradle wrapper executable
-        run: chmod +x gradlew
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze
 
       - name: Build debug APK
-        env:
-          COURIER_API_ID: ${{ secrets.COURIER_API_ID }}
-          COURIER_API_HASH: ${{ secrets.COURIER_API_HASH }}
-        run: ./gradlew :app:assembleDebug --no-daemon --stacktrace
+        run: flutter build apk --debug
 
-      - name: Prepare APK
+      - name: Build stable APK
+        run: flutter build apk --release
+
+      - name: Collect APKs
         run: |
           mkdir -p dist
-          cp app/build/outputs/apk/debug/app-debug.apk "dist/${APK_NAME}"
-          ls -lh dist
+          cp build/app/outputs/flutter-apk/app-debug.apk "dist/${DEBUG_APK}"
+          cp build/app/outputs/flutter-apk/app-release.apk "dist/${STABLE_APK}"
+          cd dist
+          sha256sum "${STABLE_APK}" "${DEBUG_APK}" > SHA256SUMS.txt
+          ls -lh
+          cat SHA256SUMS.txt
 
-      - name: Upload APK artifact
+      - name: Upload stable APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: courier-stable-apk
+          path: dist/${{ env.STABLE_APK }}
+          if-no-files-found: error
+
+      - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
           name: courier-debug-apk
-          path: dist/${{ env.APK_NAME }}
+          path: dist/${{ env.DEBUG_APK }}
           if-no-files-found: error
 
       - name: Publish GitHub release
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: courier-debug-latest
-          name: Courier debug APK (latest build)
+          tag_name: courier-latest
+          name: Courier 1.0 — stable + debug
           body: |
-            Debug-signed Courier APK built from `${{ github.sha }}`.
+            Courier rewritten in Flutter with the liquid-glass renderer and TDLib
+            as the Telegram engine.
 
-            Install it on Android 8.0+ (minSdk 26) and sign in with your own
-            Telegram `api_id` / `api_hash`.
-          files: dist/${{ env.APK_NAME }}
-          prerelease: true
+            - `Courier-1.0-stable.apk` — release build (debug-signed so it installs
+              without a private keystore; not a Play Store upload).
+            - `Courier-1.0-debug.apk` — debug build for diagnostics.
+            - `SHA256SUMS.txt` — checksums for both files.
+
+            Both are built from `${{ github.sha }}`. Android 8.0+ (minSdk 26).
+            Sign in with your own Telegram phone number; Telegram may ask for the
+            login code and, if enabled, your 2FA password.
+          files: |
+            dist/${{ env.STABLE_APK }}
+            dist/${{ env.DEBUG_APK }}
+            dist/SHA256SUMS.txt
           fail_on_unmatched_files: true
+          prerelease: false
 
       - name: Upload build reports
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: build-reports
-          path: app/build/reports/
+          path: |
+            android/.gradle
+            build/reports
+          if-no-files-found: ignore
