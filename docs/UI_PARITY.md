@@ -75,6 +75,22 @@ still lays out correctly.
   background in the shell and conversation, with no shader and no backdrop
   filter.
 
+## Stories
+
+The strip above the chat list follows the iOS layout: 66 pt circles with a
+2.6 pt ring, the poster's 58 pt avatar inset 3.2 pt, the first name in 11 pt
+grey and a 76 pt slot. An unviewed poster gets a `SweepGradient`
+(blue → violet → pink → blue, rotated to start at twelve o'clock); a fully
+viewed poster gets the separator colour. The row is absent when nobody has
+active stories, and it scrolls horizontally with bouncing physics.
+
+Data comes from TDLib, not a fixture: `GetChatActiveStories` for the chats the
+engine already holds, cached in `TelegramEngine.activeStories` and republished
+by `UpdateChatActiveStories`. `ChatActiveStories.maxReadStoryId` against the
+newest `StoryInfo.storyId` decides the ring, and only `StoryListMain` entries are
+shown. Tapping a circle opens that chat — the full-screen story player with
+`OpenStory`/`GetStory` is not part of this build.
+
 ## Deliberate differences
 
 - Android back gesture and predictive-back support instead of the iOS edge

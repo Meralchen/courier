@@ -16,6 +16,7 @@ import java.util.concurrent.ConcurrentHashMap
 internal class TelegramEngine(internal val emit: (Map<String, Any?>) -> Unit) {
 
     internal val chats = ConcurrentHashMap<Long, TdApi.Chat>()
+    internal val activeStories = ConcurrentHashMap<Long, TdApi.ChatActiveStories>()
     internal val users = ConcurrentHashMap<Long, TdApi.User>()
     internal val messages = ConcurrentHashMap<Long, MutableList<TdApi.Message>>()
     internal val hasMore = ConcurrentHashMap<Long, Boolean>()
@@ -143,6 +144,7 @@ internal class TelegramEngine(internal val emit: (Map<String, Any?>) -> Unit) {
             }
 
             is TdApi.UpdateChatAction -> onChatAction(update)
+            is TdApi.UpdateChatActiveStories -> onActiveStories(update)
 
             is TdApi.UpdateUser -> {
                 users[update.user.id] = update.user

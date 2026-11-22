@@ -59,6 +59,11 @@ smaller than the old build because of R8.
 - Photo viewer, shared-media grid and chat info with members and actions.
 - Pin, mute, clear history and delete chat from the chat list or chat info.
 - Contacts tab derived from private chats, with alphabetical sections and search.
+- Story circles above the chat list, resolved from TDLib's
+  `GetChatActiveStories` and kept live by `UpdateChatActiveStories`: the ring
+  sweeps blue → violet → pink while the poster has unviewed stories and turns
+  grey once seen. Tapping a circle opens that chat; a full-screen story viewer
+  is not built.
 - New conversation by `@username`.
 - Profile editing (first/last name, bio, username), active sessions with
   termination, TDLib cache size and cache clearing, connection diagnostics,
@@ -200,7 +205,7 @@ not copied from it:
 
 | Surface | Courier |
 | --- | --- |
-| Chats | 34 pt title that collapses into a centred nav-bar title; pinned glass search field; pinned/muted markers; blue unread pills |
+| Chats | 34 pt title that collapses into a centred nav-bar title; pinned glass search field; story circles with a gradient unread ring; pinned/muted markers; blue unread pills |
 | Conversation | Centred avatar + name + presence in the glass bar; bubbles with tails, ticks, day and unread dividers; scroll-to-latest |
 | Composer | Glass capsule input inside a glass bar, attachment/emoji, send that becomes a mic when empty |
 | Tabs | Floating glass bar; hold to swell the pill into a lens 4 pt proud of the bar and 16 pt wider than a slot, the tab under it grows to 1.18 and turns accent, drag follows the finger with a haptic per tab, flick throws it, release settles; unread badge and TalkBack actions |

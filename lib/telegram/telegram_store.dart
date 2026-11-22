@@ -38,6 +38,10 @@ class TelegramStore extends ChangeNotifier {
   /// Bumped when the chat list changes. Typing and file updates must not bump
   /// it, so screens showing only the list are not rebuilt for them.
   int chatsVersion = 0;
+
+  final List<StoryCircle> stories = <StoryCircle>[];
+  int storiesVersion = 0;
+  bool _storiesRequested = false;
   final Set<int> _requestedFiles = <int>{};
 
   List<SessionInfo> sessions = const <SessionInfo>[];
@@ -163,6 +167,12 @@ class TelegramStore extends ChangeNotifier {
             }),
           );
         chatsVersion++;
+        if (!_storiesRequested) {
+          _storiesRequested = true;
+          // The engine holds the chats now, so the per-chat story query can
+          // resolve them.
+          Future<void>.microtask(loadStories);
+        }
         _notify();
       case 'messages':
         final int chatId = asInt(event['chatId']);
@@ -214,6 +224,8 @@ class TelegramStore extends ChangeNotifier {
         final ChatInfo info = ChatInfo.fromMap(asMap(event['info']));
         _chatInfos[info.chatId] = info;
         _notify();
+      case 'stories':
+        _applyStories(asList(event['stories']));
       case 'storage':
         storageSize = asInt(event['size']);
         storageCount = asInt(event['count']);
@@ -260,13 +272,39 @@ class TelegramStore extends ChangeNotifier {
     _chats.clear();
     _messages.clear();
     _chatInfos.clear();
+    stories.clear();
+    _storiesRequested = false;
+    storiesVersion++;
     await _guard(() => _client.call('logOut'));
     _notify();
   }
 
   // ----------------------------------------------------------------- chats
 
-  Future<void> refreshChats() => _guard(() => _client.call('getChats'));
+  Future<void> refreshChats() async {
+    await _guard(() => _client.call('getChats'));
+    await loadStories();
+  }
+
+  void _applyStories(List<Object?> raw) {
+    stories
+      ..clear()
+      ..addAll(raw.map((Object? item) => StoryCircle.fromMap(asMap(item))));
+    storiesVersion++;
+    _notify();
+  }
+
+  /// Story circles are decorative: a failure here must never disturb the chat
+  /// list, so it is swallowed rather than surfaced as a connection error.
+  Future<void> loadStories() async {
+    try {
+      final List<Object?> raw =
+          await _client.invoke<List<Object?>>('stories') ?? const <Object?>[];
+      _applyStories(raw);
+    } catch (_) {
+      // Leave the previous row in place.
+    }
+  }
 
   Future<void> openChat(int chatId) async {
     openChatId = chatId;

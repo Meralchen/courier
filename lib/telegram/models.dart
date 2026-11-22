@@ -17,7 +17,8 @@ Map<String, Object?> asMap(Object? v) {
   if (v is Map<String, Object?>) return v;
   if (v is Map) {
     return v.map<String, Object?>(
-      (Object? k, Object? value) => MapEntry<String, Object?>(k.toString(), value),
+      (Object? k, Object? value) =>
+          MapEntry<String, Object?>(k.toString(), value),
     );
   }
   return const <String, Object?>{};
@@ -60,14 +61,14 @@ class AuthState {
   });
 
   factory AuthState.fromMap(Map<String, Object?> m) => AuthState(
-        stage: AuthStage.parse(m['stage']),
-        error: (m['error'] as String?)?.trim().isEmpty ?? true
-            ? null
-            : m['error'] as String?,
-        busy: asBool(m['busy']),
-        codeLength: asInt(m['codeLength'], 5).clamp(3, 8),
-        passwordHint: m['passwordHint'] as String?,
-      );
+    stage: AuthStage.parse(m['stage']),
+    error: (m['error'] as String?)?.trim().isEmpty ?? true
+        ? null
+        : m['error'] as String?,
+    busy: asBool(m['busy']),
+    codeLength: asInt(m['codeLength'], 5).clamp(3, 8),
+    passwordHint: m['passwordHint'] as String?,
+  );
 
   final AuthStage stage;
   final String? error;
@@ -88,14 +89,13 @@ class AuthState {
     int? codeLength,
     String? passwordHint,
     bool clearError = false,
-  }) =>
-      AuthState(
-        stage: stage ?? this.stage,
-        error: clearError ? null : (error ?? this.error),
-        busy: busy ?? this.busy,
-        codeLength: codeLength ?? this.codeLength,
-        passwordHint: passwordHint ?? this.passwordHint,
-      );
+  }) => AuthState(
+    stage: stage ?? this.stage,
+    error: clearError ? null : (error ?? this.error),
+    busy: busy ?? this.busy,
+    codeLength: codeLength ?? this.codeLength,
+    passwordHint: passwordHint ?? this.passwordHint,
+  );
 }
 
 class ChatSummary {
@@ -124,28 +124,28 @@ class ChatSummary {
   });
 
   factory ChatSummary.fromMap(Map<String, Object?> m) => ChatSummary(
-        id: asInt(m['id']),
-        title: asString(m['title'], 'Chat'),
-        preview: asString(m['preview']),
-        date: asInt(m['date']),
-        unread: asInt(m['unread']),
-        pinned: asBool(m['pinned']),
-        muted: asBool(m['muted']),
-        isPrivate: asBool(m['isPrivate']),
-        lastOutgoing: asBool(m['lastOutgoing']),
-        userId: asInt(m['userId']),
-        online: asBool(m['online']),
-        typing: asBool(m['typing']),
-        photoFileId: asInt(m['photoFileId']),
-        photoPath: asString(m['photoPath']),
-        lastMessageId: asInt(m['lastMessageId']),
-        readOutboxMaxId: asInt(m['readOutboxMaxId']),
-        readInboxMaxId: asInt(m['readInboxMaxId']),
-        unreadMention: asBool(m['unreadMention']),
-        isGroup: asBool(m['isGroup']),
-        memberCount: asInt(m['memberCount']),
-        lastSeen: asInt(m['lastSeen']),
-      );
+    id: asInt(m['id']),
+    title: asString(m['title'], 'Chat'),
+    preview: asString(m['preview']),
+    date: asInt(m['date']),
+    unread: asInt(m['unread']),
+    pinned: asBool(m['pinned']),
+    muted: asBool(m['muted']),
+    isPrivate: asBool(m['isPrivate']),
+    lastOutgoing: asBool(m['lastOutgoing']),
+    userId: asInt(m['userId']),
+    online: asBool(m['online']),
+    typing: asBool(m['typing']),
+    photoFileId: asInt(m['photoFileId']),
+    photoPath: asString(m['photoPath']),
+    lastMessageId: asInt(m['lastMessageId']),
+    readOutboxMaxId: asInt(m['readOutboxMaxId']),
+    readInboxMaxId: asInt(m['readInboxMaxId']),
+    unreadMention: asBool(m['unreadMention']),
+    isGroup: asBool(m['isGroup']),
+    memberCount: asInt(m['memberCount']),
+    lastSeen: asInt(m['lastSeen']),
+  );
 
   final int id;
   final String title;
@@ -184,30 +184,29 @@ class ChatSummary {
     int? readOutboxMaxId,
     int? readInboxMaxId,
     bool? unreadMention,
-  }) =>
-      ChatSummary(
-        id: id,
-        title: title,
-        preview: preview ?? this.preview,
-        date: date ?? this.date,
-        unread: unread ?? this.unread,
-        pinned: pinned ?? this.pinned,
-        muted: muted ?? this.muted,
-        isPrivate: isPrivate,
-        lastOutgoing: lastOutgoing,
-        userId: userId,
-        online: online ?? this.online,
-        typing: typing ?? this.typing,
-        photoFileId: photoFileId,
-        photoPath: photoPath ?? this.photoPath,
-        lastMessageId: lastMessageId ?? this.lastMessageId,
-        readOutboxMaxId: readOutboxMaxId ?? this.readOutboxMaxId,
-        readInboxMaxId: readInboxMaxId ?? this.readInboxMaxId,
-        unreadMention: unreadMention ?? this.unreadMention,
-        isGroup: isGroup,
-        memberCount: memberCount,
-        lastSeen: lastSeen,
-      );
+  }) => ChatSummary(
+    id: id,
+    title: title,
+    preview: preview ?? this.preview,
+    date: date ?? this.date,
+    unread: unread ?? this.unread,
+    pinned: pinned ?? this.pinned,
+    muted: muted ?? this.muted,
+    isPrivate: isPrivate,
+    lastOutgoing: lastOutgoing,
+    userId: userId,
+    online: online ?? this.online,
+    typing: typing ?? this.typing,
+    photoFileId: photoFileId,
+    photoPath: photoPath ?? this.photoPath,
+    lastMessageId: lastMessageId ?? this.lastMessageId,
+    readOutboxMaxId: readOutboxMaxId ?? this.readOutboxMaxId,
+    readInboxMaxId: readInboxMaxId ?? this.readInboxMaxId,
+    unreadMention: unreadMention ?? this.unreadMention,
+    isGroup: isGroup,
+    memberCount: memberCount,
+    lastSeen: lastSeen,
+  );
 }
 
 class Message {
@@ -240,32 +239,32 @@ class Message {
   });
 
   factory Message.fromMap(Map<String, Object?> m) => Message(
-        id: asInt(m['id']),
-        chatId: asInt(m['chatId']),
-        text: asString(m['text']),
-        date: asInt(m['date']),
-        outgoing: asBool(m['outgoing']),
-        pending: asBool(m['pending']),
-        failed: asBool(m['failed']),
-        sender: asString(m['sender']),
-        senderId: asInt(m['senderId']),
-        kind: asString(m['kind'], 'text'),
-        photoFileId: asInt(m['photoFileId']),
-        photoPath: asString(m['photoPath']),
-        width: asInt(m['width']),
-        height: asInt(m['height']),
-        fileName: asString(m['fileName']),
-        fileSize: asInt(m['fileSize']),
-        duration: asInt(m['duration']),
-        edited: asBool(m['edited']),
-        replyToId: asInt(m['replyToId']),
-        replyToText: asString(m['replyToText']),
-        replyToSender: asString(m['replyToSender']),
-        albumId: asInt(m['albumId']),
-        isService: asBool(m['isService']),
-        read: asBool(m['read']),
-        isChannelPost: asBool(m['isChannelPost']),
-      );
+    id: asInt(m['id']),
+    chatId: asInt(m['chatId']),
+    text: asString(m['text']),
+    date: asInt(m['date']),
+    outgoing: asBool(m['outgoing']),
+    pending: asBool(m['pending']),
+    failed: asBool(m['failed']),
+    sender: asString(m['sender']),
+    senderId: asInt(m['senderId']),
+    kind: asString(m['kind'], 'text'),
+    photoFileId: asInt(m['photoFileId']),
+    photoPath: asString(m['photoPath']),
+    width: asInt(m['width']),
+    height: asInt(m['height']),
+    fileName: asString(m['fileName']),
+    fileSize: asInt(m['fileSize']),
+    duration: asInt(m['duration']),
+    edited: asBool(m['edited']),
+    replyToId: asInt(m['replyToId']),
+    replyToText: asString(m['replyToText']),
+    replyToSender: asString(m['replyToSender']),
+    albumId: asInt(m['albumId']),
+    isService: asBool(m['isService']),
+    read: asBool(m['read']),
+    isChannelPost: asBool(m['isChannelPost']),
+  );
 
   final int id;
   final int chatId;
@@ -299,32 +298,32 @@ class Message {
   bool get hasMedia => photoFileId > 0 || photoPath.isNotEmpty;
 
   Message copyWith({bool? read, bool? pending, bool? failed}) => Message(
-        id: id,
-        chatId: chatId,
-        text: text,
-        date: date,
-        outgoing: outgoing,
-        pending: pending ?? this.pending,
-        failed: failed ?? this.failed,
-        sender: sender,
-        senderId: senderId,
-        kind: kind,
-        photoFileId: photoFileId,
-        photoPath: photoPath,
-        width: width,
-        height: height,
-        fileName: fileName,
-        fileSize: fileSize,
-        duration: duration,
-        edited: edited,
-        replyToId: replyToId,
-        replyToText: replyToText,
-        replyToSender: replyToSender,
-        albumId: albumId,
-        isService: isService,
-        read: read ?? this.read,
-        isChannelPost: isChannelPost,
-      );
+    id: id,
+    chatId: chatId,
+    text: text,
+    date: date,
+    outgoing: outgoing,
+    pending: pending ?? this.pending,
+    failed: failed ?? this.failed,
+    sender: sender,
+    senderId: senderId,
+    kind: kind,
+    photoFileId: photoFileId,
+    photoPath: photoPath,
+    width: width,
+    height: height,
+    fileName: fileName,
+    fileSize: fileSize,
+    duration: duration,
+    edited: edited,
+    replyToId: replyToId,
+    replyToText: replyToText,
+    replyToSender: replyToSender,
+    albumId: albumId,
+    isService: isService,
+    read: read ?? this.read,
+    isChannelPost: isChannelPost,
+  );
 }
 
 class Profile {
@@ -340,15 +339,15 @@ class Profile {
   });
 
   factory Profile.fromMap(Map<String, Object?> m) => Profile(
-        id: asInt(m['id']),
-        firstName: asString(m['firstName']),
-        lastName: asString(m['lastName']),
-        phone: asString(m['phone']),
-        username: asString(m['username']),
-        bio: asString(m['bio']),
-        photoFileId: asInt(m['photoFileId']),
-        photoPath: asString(m['photoPath']),
-      );
+    id: asInt(m['id']),
+    firstName: asString(m['firstName']),
+    lastName: asString(m['lastName']),
+    phone: asString(m['phone']),
+    username: asString(m['username']),
+    bio: asString(m['bio']),
+    photoFileId: asInt(m['photoFileId']),
+    photoPath: asString(m['photoPath']),
+  );
 
   final int id;
   final String firstName;
@@ -384,19 +383,19 @@ class ChatInfo {
   });
 
   factory ChatInfo.fromMap(Map<String, Object?> m) => ChatInfo(
-        chatId: asInt(m['chatId']),
-        title: asString(m['title'], 'Chat'),
-        about: asString(m['about']),
-        phone: asString(m['phone']),
-        username: asString(m['username']),
-        photoFileId: asInt(m['photoFileId']),
-        photoPath: asString(m['photoPath']),
-        memberCount: asInt(m['memberCount']),
-        isPrivate: asBool(m['isPrivate']),
-        muted: asBool(m['muted']),
-        pinned: asBool(m['pinned']),
-        isBlocked: asBool(m['isBlocked']),
-      );
+    chatId: asInt(m['chatId']),
+    title: asString(m['title'], 'Chat'),
+    about: asString(m['about']),
+    phone: asString(m['phone']),
+    username: asString(m['username']),
+    photoFileId: asInt(m['photoFileId']),
+    photoPath: asString(m['photoPath']),
+    memberCount: asInt(m['memberCount']),
+    isPrivate: asBool(m['isPrivate']),
+    muted: asBool(m['muted']),
+    pinned: asBool(m['pinned']),
+    isBlocked: asBool(m['isBlocked']),
+  );
 
   final int chatId;
   final String title;
@@ -424,14 +423,14 @@ class SessionInfo {
   });
 
   factory SessionInfo.fromMap(Map<String, Object?> m) => SessionInfo(
-        id: asInt(m['id']),
-        current: asBool(m['current']),
-        device: asString(m['device'], 'Unknown device'),
-        application: asString(m['application']),
-        location: asString(m['location']),
-        ip: asString(m['ip']),
-        lastActive: asInt(m['lastActive']),
-      );
+    id: asInt(m['id']),
+    current: asBool(m['current']),
+    device: asString(m['device'], 'Unknown device'),
+    application: asString(m['application']),
+    location: asString(m['location']),
+    ip: asString(m['ip']),
+    lastActive: asInt(m['lastActive']),
+  );
 
   final int id;
   final bool current;
@@ -440,4 +439,43 @@ class SessionInfo {
   final String location;
   final String ip;
   final int lastActive;
+}
+
+/// One circle in the story strip, resolved by the native side from
+/// `GetChatActiveStories` / `UpdateChatActiveStories`.
+class StoryCircle {
+  const StoryCircle({
+    required this.chatId,
+    required this.title,
+    this.photoFileId = 0,
+    this.photoPath = '',
+    this.count = 0,
+    this.unread = false,
+    this.order = 0,
+  });
+
+  final int chatId;
+  final String title;
+  final int photoFileId;
+  final String photoPath;
+  final int count;
+  final bool unread;
+  final int order;
+
+  /// iOS labels the circle with the poster's first name only.
+  String get firstName {
+    final String trimmed = title.trim();
+    if (trimmed.isEmpty) return title;
+    return trimmed.split(RegExp(r'\s+')).first;
+  }
+
+  factory StoryCircle.fromMap(Map<String, Object?> map) => StoryCircle(
+    chatId: asInt(map['chatId']),
+    title: asString(map['title']),
+    photoFileId: asInt(map['photoFileId']),
+    photoPath: asString(map['photoPath']),
+    count: asInt(map['count']),
+    unread: asBool(map['unread']),
+    order: asInt(map['order']),
+  );
 }

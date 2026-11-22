@@ -10,6 +10,7 @@ import '../../telegram/telegram_store.dart';
 import '../chat/chat_screen.dart';
 import '../components/ios_ui.dart';
 import 'chat_row.dart';
+import 'stories_row.dart';
 import 'new_chat_screen.dart';
 
 class ChatListScreen extends StatefulWidget {
@@ -35,15 +36,19 @@ class _ChatListScreenState extends State<ChatListScreen> {
     if (_query.trim().isEmpty) return source;
     final String needle = _query.toLowerCase();
     return source
-        .where((ChatSummary chat) =>
-            chat.title.toLowerCase().contains(needle) ||
-            chat.preview.toLowerCase().contains(needle))
+        .where(
+          (ChatSummary chat) =>
+              chat.title.toLowerCase().contains(needle) ||
+              chat.preview.toLowerCase().contains(needle),
+        )
         .toList();
   }
 
   Future<void> _newChat() async {
     final int? chatId = await Navigator.of(context).push<int>(
-      CupertinoPageRoute<int>(builder: (BuildContext _) => const NewChatScreen()),
+      CupertinoPageRoute<int>(
+        builder: (BuildContext _) => const NewChatScreen(),
+      ),
     );
     if (chatId != null && mounted) {
       await Navigator.of(context).push(
@@ -59,7 +64,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
     final TelegramStore store = TelegramScope.read(context);
     return StoreSelector<Object>(
       select: (TelegramStore store) =>
-          '${store.chatsVersion}|${store.totalUnread}|${store.connection}',
+          '${store.chatsVersion}|${store.storiesVersion}|'
+          '${store.totalUnread}|${store.connection}',
       builder: (BuildContext context, Object _) => _build(context, store),
     );
   }
@@ -67,10 +73,12 @@ class _ChatListScreenState extends State<ChatListScreen> {
   Widget _build(BuildContext context, TelegramStore store) {
     final AppColors colors = AppColors.of(context);
     final List<ChatSummary> all = _filtered(store.chats);
-    final List<ChatSummary> pinned =
-        all.where((ChatSummary chat) => chat.pinned).toList();
-    final List<ChatSummary> rest =
-        all.where((ChatSummary chat) => !chat.pinned).toList();
+    final List<ChatSummary> pinned = all
+        .where((ChatSummary chat) => chat.pinned)
+        .toList();
+    final List<ChatSummary> rest = all
+        .where((ChatSummary chat) => !chat.pinned)
+        .toList();
 
     return SafeArea(
       bottom: false,
@@ -99,6 +107,18 @@ class _ChatListScreenState extends State<ChatListScreen> {
                   onCompose: _newChat,
                 ),
               ),
+              if (store.stories.isNotEmpty)
+                SliverToBoxAdapter(
+                  child: StoriesRow(
+                    stories: store.stories,
+                    onOpen: (StoryCircle story) => Navigator.of(context).push(
+                      CupertinoPageRoute<void>(
+                        builder: (BuildContext _) =>
+                            ChatScreen(chatId: story.chatId),
+                      ),
+                    ),
+                  ),
+                ),
               if (all.isEmpty)
                 SliverFillRemaining(
                   hasScrollBody: false,
@@ -108,13 +128,15 @@ class _ChatListScreenState extends State<ChatListScreen> {
                       icon: store.chats.isEmpty
                           ? Icons.chat_bubble_outline
                           : Icons.search_off,
-                      title: store.chats.isEmpty ? 'No chats yet' : 'No results',
+                      title: store.chats.isEmpty
+                          ? 'No chats yet'
+                          : 'No results',
                       message: store.chats.isEmpty
                           ? (store.connection == 'Connected'
-                              ? 'Start a conversation from Contacts or tap the '
-                                  'compose button. Chats appear here as TDLib '
-                                  'syncs them.'
-                              : 'Telegram is connecting. Pull down to retry.')
+                                ? 'Start a conversation from Contacts or tap the '
+                                      'compose button. Chats appear here as TDLib '
+                                      'syncs them.'
+                                : 'Telegram is connecting. Pull down to retry.')
                           : 'Try a different name or message.',
                     ),
                   ),
@@ -129,9 +151,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
               ],
               if (rest.isNotEmpty) ...<Widget>[
                 SliverToBoxAdapter(
-                  child: SectionLabel(
-                    _query.isEmpty ? 'All chats' : 'Results',
-                  ),
+                  child: SectionLabel(_query.isEmpty ? 'All chats' : 'Results'),
                 ),
                 SliverList.builder(
                   itemCount: rest.length,
@@ -146,7 +166,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                     store.chats.isEmpty
                         ? ''
                         : '${store.chats.length} chats · '
-                            '${store.totalUnread} unread',
+                              '${store.totalUnread} unread',
                     textAlign: TextAlign.center,
                     style: AppText.caption.copyWith(
                       color: colors.textSecondary,
