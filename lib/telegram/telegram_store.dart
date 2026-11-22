@@ -27,6 +27,7 @@ class TelegramStore extends ChangeNotifier {
   final Map<int, List<Message>> _messages = <int, List<Message>>{};
   final Map<int, bool> _hasMore = <int, bool>{};
   final Map<int, ChatInfo> _chatInfos = <int, ChatInfo>{};
+  final Map<int, Message> _pinned = <int, Message>{};
 
   final Map<int, String> filePaths = <int, String>{};
   final Map<int, double> fileProgress = <int, double>{};
@@ -112,6 +113,9 @@ class TelegramStore extends ChangeNotifier {
   ChatSummary? chat(int id) => _chats[id];
 
   ChatInfo? infoFor(int chatId) => _chatInfos[chatId];
+
+  /// The message pinned in the bar above the transcript, if any.
+  Message? pinnedFor(int chatId) => _pinned[chatId];
 
   List<Message> messagesFor(int chatId) =>
       _messages[chatId] ?? const <Message>[];
@@ -224,6 +228,12 @@ class TelegramStore extends ChangeNotifier {
               ..sort((Message a, Message b) => a.id.compareTo(b.id));
         _messages[chatId] = list;
         _hasMore[chatId] = asBool(event['hasMore']);
+        final Object? pinned = event['pinned'];
+        if (pinned is Map) {
+          _pinned[chatId] = Message.fromMap(asMap(pinned));
+        } else {
+          _pinned.remove(chatId);
+        }
         final ChatSummary? summary = _chats[chatId];
         if (summary != null && list.isNotEmpty) {
           final Message last = list.last;
@@ -316,6 +326,7 @@ class TelegramStore extends ChangeNotifier {
     _chats.clear();
     _messages.clear();
     _chatInfos.clear();
+    _pinned.clear();
     stories.clear();
     savedGifs = const <GifItem>[];
     folders = const <ChatFolder>[];
@@ -465,6 +476,62 @@ class TelegramStore extends ChangeNotifier {
       'messageIds': ids,
     }),
   );
+
+  Future<void> pinMessage(int chatId, int messageId, bool pinned) => _guard(
+    () => _client.call('pin', <String, Object?>{
+      'chatId': chatId,
+      'messageId': messageId,
+      'pinned': pinned,
+    }),
+  );
+
+  /// Mirrors the in-app notification switches into the native notifier.
+  Future<void> syncNotifications({
+    required bool enabled,
+    required bool sounds,
+  }) => _guard(
+    () => _client.call('notificationsSync', <String, Object?>{
+      'enabled': enabled,
+      'sounds': sounds,
+    }),
+  );
+
+  Future<void> addMembers(int chatId, List<int> userIds) => _guard(
+    () => _client.call('addMembers', <String, Object?>{
+      'chatId': chatId,
+      'userIds': userIds,
+    }),
+  );
+
+  Future<void> leaveChat(int chatId) => _guard(
+    () => _client.call('leaveChat', <String, Object?>{'chatId': chatId}),
+  );
+
+  Future<void> setChatTitle(int chatId, String title) => _guard(
+    () => _client.call('setTitle', <String, Object?>{
+      'chatId': chatId,
+      'title': title,
+    }),
+  );
+
+  Future<void> setChatDescription(int chatId, String description) => _guard(
+    () => _client.call('setDescription', <String, Object?>{
+      'chatId': chatId,
+      'description': description,
+    }),
+  );
+
+  Future<int?> openUser(int userId) async {
+    try {
+      return await _client.invoke<int>('openUser', <String, Object?>{
+        'userId': userId,
+      });
+    } catch (error) {
+      lastError = error.toString();
+      _notify();
+      return null;
+    }
+  }
 
   Future<void> setArchived(int chatId, bool archived) => _guard(
     () => _client.call('setArchived', <String, Object?>{

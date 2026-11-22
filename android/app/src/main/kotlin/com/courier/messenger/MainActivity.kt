@@ -11,6 +11,7 @@ import android.provider.OpenableColumns
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import com.courier.messenger.telegram.CourierNotifications
 import com.courier.messenger.telegram.CourierTelegramPlugin
 import java.io.File
 import java.io.FileOutputStream
@@ -26,9 +27,11 @@ class MainActivity : FlutterActivity() {
     private var player: VoicePlayer? = null
     private var pendingStart: MethodChannel.Result? = null
     private var pendingFile: MethodChannel.Result? = null
+    private var pendingChatId: Long = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        pendingChatId = intent?.getLongExtra(CourierNotifications.EXTRA_CHAT_ID, 0L) ?: 0L
         // Notifications are the only permission the shell needs up front; the
         // Telegram engine silently skips them until Android grants it.
         if (
@@ -91,6 +94,20 @@ class MainActivity : FlutterActivity() {
             }
         }
 
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            NOTIFICATIONS_CHANNEL,
+        ).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "pendingChat" -> {
+                    val chatId = pendingChatId
+                    pendingChatId = 0L
+                    result.success(chatId)
+                }
+                else -> result.notImplemented()
+            }
+        }
+
         // Documents come from Android's own file picker so the app does not
         // carry a picker plugin; the chosen file is copied into our cache so
         // TDLib can read a stable local path.
@@ -121,6 +138,12 @@ class MainActivity : FlutterActivity() {
             pendingFile = null
             result.error("file", "No file picker is available", null)
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        pendingChatId = intent.getLongExtra(CourierNotifications.EXTRA_CHAT_ID, 0L)
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
@@ -219,6 +242,7 @@ class MainActivity : FlutterActivity() {
     companion object {
         const val VOICE_CHANNEL = "courier/voice"
         const val FILE_CHANNEL = "courier/files"
+        const val NOTIFICATIONS_CHANNEL = "courier/notifications"
         private const val NOTIFICATIONS_REQUEST = 7402
         private const val FILE_REQUEST = 7403
     }

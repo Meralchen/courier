@@ -96,6 +96,11 @@ internal fun TelegramEngine.handle(
             result,
         )
         "openFile" -> openLocalFile(string("path"), result)
+        "notificationsSync" -> {
+            notificationsEnabled = bool("enabled")
+            notificationSounds = bool("sounds")
+            result.success(null)
+        }
         "sendVoice" -> sendVoice(
             long("chatId"),
             string("path"),
@@ -116,6 +121,21 @@ internal fun TelegramEngine.handle(
             result,
         )
         "deleteMessages" -> deleteMessages(long("chatId"), ids("messageIds"), result)
+        "pin" -> pinMessage(
+            long("chatId"),
+            long("messageId"),
+            bool("pinned"),
+            result,
+        )
+        "openUser" -> openUser(long("userId"), result)
+        "addMembers" -> addMembers(long("chatId"), ids("userIds"), result)
+        "leaveChat" -> leaveChat(long("chatId"), result)
+        "setTitle" -> setChatTitle(long("chatId"), string("title"), result)
+        "setDescription" -> setChatDescription(
+            long("chatId"),
+            string("description"),
+            result,
+        )
         "pinChat" -> {
             setPinned(long("chatId"), bool("pinned"))
             result.success(null)

@@ -19,6 +19,7 @@ internal class TelegramEngine(internal val emit: (Map<String, Any?>) -> Unit) {
     internal val activeStories = ConcurrentHashMap<Long, TdApi.ChatActiveStories>()
     internal val users = ConcurrentHashMap<Long, TdApi.User>()
     internal val messages = ConcurrentHashMap<Long, MutableList<TdApi.Message>>()
+    internal val pinnedMessages = ConcurrentHashMap<Long, TdApi.Message>()
     internal val hasMore = ConcurrentHashMap<Long, Boolean>()
     internal val typingUntil = ConcurrentHashMap<Long, Long>()
     internal val requestedFiles = ConcurrentHashMap.newKeySet<Int>()
@@ -30,6 +31,8 @@ internal class TelegramEngine(internal val emit: (Map<String, Any?>) -> Unit) {
     internal var client: Client? = null
     internal var appContext: Context? = null
     internal var notifications: CourierNotifications? = null
+    internal var notificationsEnabled = true
+    internal var notificationSounds = true
     internal var apiId = 0
     internal var apiHash = ""
     internal var myId = 0L
@@ -213,6 +216,10 @@ internal class TelegramEngine(internal val emit: (Map<String, Any?>) -> Unit) {
                 val list = messages[update.chatId]
                 if (list != null) {
                     list.removeAll { message -> update.messageIds.contains(message.id) }
+                }
+                val pinned = pinnedMessages[update.chatId]
+                if (pinned != null && update.messageIds.contains(pinned.id)) {
+                    refreshPinned(update.chatId)
                 }
                 publishConversationIfOpen(update.chatId)
                 publishChats()

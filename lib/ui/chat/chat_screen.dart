@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/format.dart';
 import '../../core/motion.dart';
@@ -48,6 +49,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   int? _unreadMarker;
   int _lastCount = 0;
   bool _didInitialJump = false;
+  Timer? _draftTimer;
+
+  String get _draftKey => 'courier.draft.${widget.chatId}';
 
   // Bubbles are expensive to build (layout, media, copy). TDLib notifies for
   // typing and files too; rebuilding every bubble for those is what made a
@@ -64,9 +68,43 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _scroll.addListener(_onScroll);
+    _draft.addListener(_scheduleDraftSave);
+    _restoreDraft();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       TelegramScope.read(context).openChat(widget.chatId);
     });
+  }
+
+  Future<void> _restoreDraft() async {
+    try {
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      final String? saved = prefs.getString(_draftKey);
+      if (saved == null || !mounted || _draft.text.isNotEmpty) return;
+      _draft.text = saved;
+      _draft.selection = TextSelection.collapsed(offset: saved.length);
+    } catch (_) {
+      // A draft is a convenience; failing to read one must not break the chat.
+    }
+  }
+
+  void _scheduleDraftSave() {
+    _draftTimer?.cancel();
+    _draftTimer = Timer(const Duration(milliseconds: 500), () {
+      _persistDraft(_draft.text);
+    });
+  }
+
+  Future<void> _persistDraft(String text) async {
+    try {
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      if (text.trim().isEmpty) {
+        await prefs.remove(_draftKey);
+      } else {
+        await prefs.setString(_draftKey, text);
+      }
+    } catch (_) {
+      // Drafts are best effort and never surface an error.
+    }
   }
 
   @override
@@ -89,6 +127,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _draftTimer?.cancel();
+    _persistDraft(_draft.text);
     _scroll.dispose();
     _draft.dispose();
     _store?.closeChat();
@@ -381,8 +421,28 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     await store.toggleReaction(widget.chatId, message.id, emoji);
   }
 
+  Future<void> _pinnedActions(Message pinned) async {
+    final TelegramStore store = TelegramScope.read(context);
+    final String? action = await showActionSheet<String>(
+      context,
+      title: pinned.text.isEmpty ? 'Pinned message' : pinned.text,
+      actions: const <SheetAction<String>>[
+        SheetAction<String>(
+          label: 'Unpin message',
+          icon: Icons.push_pin_outlined,
+          value: 'unpin',
+          destructive: true,
+        ),
+      ],
+    );
+    if (action == 'unpin') {
+      await store.pinMessage(widget.chatId, pinned.id, false);
+    }
+  }
+
   Future<void> _actions(Message message) async {
     final TelegramStore store = TelegramScope.read(context);
+    final bool isPinned = store.pinnedFor(widget.chatId)?.id == message.id;
     final List<SheetAction<String>> actions = <SheetAction<String>>[
       const SheetAction<String>(
         label: 'React',
@@ -404,6 +464,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         label: 'Forward',
         icon: Icons.forward,
         value: 'forward',
+      ),
+      SheetAction<String>(
+        label: isPinned ? 'Unpin' : 'Pin',
+        icon: Icons.push_pin_outlined,
+        value: 'pin',
       ),
       if (message.outgoing &&
           message.kind == 'text' &&
@@ -450,6 +515,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               duration: Duration(milliseconds: 1400),
             ),
           );
+        }
+      case 'pin':
+        await store.pinMessage(widget.chatId, message.id, !isPinned);
+        if (mounted) {
+          _notice(isPinned ? 'Message unpinned' : 'Pinned to this chat');
         }
       case 'edit':
         final String? edited = await showEditMessageDialog(context, message);
@@ -539,6 +609,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     final TelegramStore store = TelegramScope.of(context);
     final ChatSummary? chat = store.chat(widget.chatId);
     final List<Message> messages = store.messagesFor(widget.chatId);
+    final Message? pinned = store.pinnedFor(widget.chatId);
     final bool rowsFresh =
         _cachedRows != null &&
         identical(messages, _cachedMessages) &&
@@ -595,7 +666,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                                   ScrollViewKeyboardDismissBehavior.onDrag,
                               padding: EdgeInsets.fromLTRB(
                                 2,
-                                MediaQuery.paddingOf(context).top + 66,
+                                MediaQuery.paddingOf(context).top +
+                                    66 +
+                                    (pinned != null ? 48 : 0),
                                 2,
                                 10,
                               ),
@@ -649,6 +722,18 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               ),
             ),
           ),
+          if (pinned != null)
+            Positioned(
+              top: MediaQuery.paddingOf(context).top + 52,
+              left: 8,
+              right: 8,
+              child: _PinnedBar(
+                message: pinned,
+                onTap: () => _pinnedActions(pinned),
+                onUnpin: () =>
+                    store.pinMessage(widget.chatId, pinned.id, false),
+              ),
+            ),
           if (_loadingMore)
             Positioned(
               top: MediaQuery.paddingOf(context).top + 66,
@@ -847,6 +932,81 @@ class _EmptyConversation extends StatelessWidget {
             style: AppText.subhead.copyWith(color: colors.textSecondary),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// The pinned-message bar under the chat header, as Telegram iOS draws it.
+class _PinnedBar extends StatelessWidget {
+  const _PinnedBar({
+    required this.message,
+    required this.onTap,
+    required this.onUnpin,
+  });
+
+  final Message message;
+  final VoidCallback onTap;
+  final VoidCallback onUnpin;
+
+  @override
+  Widget build(BuildContext context) {
+    final AppColors colors = AppColors.of(context);
+    final String text = message.text.isEmpty ? 'Attachment' : message.text;
+    final String label = message.outgoing || message.sender.isEmpty
+        ? 'Pinned message'
+        : 'Pinned · ${message.sender}';
+    return GestureDetector(
+      onTap: onTap,
+      child: GlassCard(
+        radius: 14,
+        padding: const EdgeInsets.fromLTRB(10, 6, 2, 6),
+        child: Row(
+          children: <Widget>[
+            Container(
+              width: 2.5,
+              height: 28,
+              decoration: BoxDecoration(
+                color: colors.accent,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(width: 9),
+            Icon(Icons.push_pin, size: 14, color: colors.accent),
+            const SizedBox(width: 7),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppText.caption.copyWith(
+                      color: colors.accent,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 1),
+                  Text(
+                    text,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppText.subhead.copyWith(
+                      fontSize: 14,
+                      color: colors.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              onPressed: onUnpin,
+              visualDensity: VisualDensity.compact,
+              icon: Icon(Icons.close, size: 16, color: colors.textSecondary),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -49,6 +49,7 @@ internal fun TelegramEngine.publishConversation(chatId: Long) {
             "messages" to list.map { messageMap(it, chat) },
             "hasMore" to (hasMore[chatId] ?: false),
             "readOutboxMaxId" to (chat?.lastReadOutboxMessageId ?: 0L),
+            "pinned" to pinnedMessages[chatId]?.let { messageMap(it, chat) },
         ),
     )
 }

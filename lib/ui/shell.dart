@@ -4,8 +4,10 @@ import 'package:material_ui/material_ui.dart';
 import '../core/theme.dart';
 import '../state/app_settings.dart';
 import '../state/scopes.dart';
+import '../telegram/notification_link.dart';
 import '../telegram/telegram_store.dart';
 import 'calls/calls_screen.dart';
+import 'chat/chat_screen.dart';
 import 'chats/chat_list_screen.dart';
 import 'components/glass.dart';
 import 'contacts/contacts_screen.dart';
@@ -21,10 +23,46 @@ class MainShell extends StatefulWidget {
   State<MainShell> createState() => MainShellState();
 }
 
-class MainShellState extends State<MainShell> {
+class MainShellState extends State<MainShell> with WidgetsBindingObserver {
   int _tab = 2;
   bool _showingError = false;
+  bool _openingNotification = false;
+  bool _notificationsSynced = false;
   TelegramStore? _store;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _openPendingChat());
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _openPendingChat();
+  }
+
+  /// A tapped notification carries a chat id; open it once. The native side
+  /// clears the id when read, so a resume with no notification does nothing.
+  Future<void> _openPendingChat() async {
+    if (_openingNotification || !mounted || !_storeReady) return;
+    _openingNotification = true;
+    final int chatId = await NotificationLink.pendingChat();
+    if (!mounted) {
+      _openingNotification = false;
+      return;
+    }
+    if (chatId != 0) {
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (BuildContext _) => ChatScreen(chatId: chatId),
+        ),
+      );
+    }
+    _openingNotification = false;
+  }
+
+  bool get _storeReady => _store?.signedIn ?? false;
 
   void goToTab(int index) {
     if (_tab == index) return;
@@ -49,6 +87,7 @@ class MainShellState extends State<MainShell> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _store?.removeListener(_onStoreChanged);
     super.dispose();
   }
@@ -84,6 +123,19 @@ class MainShellState extends State<MainShell> {
     final AppColors colors = AppColors.of(context);
     final AppSettings settings = SettingsScope.of(context);
     final bool classic = !settings.liquid;
+
+    // Apply the stored switches to the native notifier once the shell is up.
+    if (!_notificationsSynced) {
+      _notificationsSynced = true;
+      final TelegramStore store = TelegramScope.read(context);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        store.syncNotifications(
+          enabled: settings.notifications,
+          sounds: settings.sounds,
+        );
+      });
+    }
 
     return Scaffold(
       backgroundColor: colors.background,

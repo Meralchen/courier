@@ -525,6 +525,37 @@ class Profile {
   String get initials => initialsOf(name);
 }
 
+/// One member or subscriber of a group or channel.
+class ChatMemberInfo {
+  const ChatMemberInfo({
+    required this.userId,
+    required this.title,
+    this.username = '',
+    this.photoFileId = 0,
+    this.photoPath = '',
+    this.online = false,
+    this.lastSeen = 0,
+  });
+
+  factory ChatMemberInfo.fromMap(Map<String, Object?> m) => ChatMemberInfo(
+    userId: asInt(m['userId']),
+    title: asString(m['title'], 'Member'),
+    username: asString(m['username']),
+    photoFileId: asInt(m['photoFileId']),
+    photoPath: asString(m['photoPath']),
+    online: asBool(m['online']),
+    lastSeen: asInt(m['lastSeen']),
+  );
+
+  final int userId;
+  final String title;
+  final String username;
+  final int photoFileId;
+  final String photoPath;
+  final bool online;
+  final int lastSeen;
+}
+
 class ChatInfo {
   const ChatInfo({
     required this.chatId,
@@ -539,6 +570,7 @@ class ChatInfo {
     required this.muted,
     required this.pinned,
     required this.isBlocked,
+    this.members = const <ChatMemberInfo>[],
   });
 
   factory ChatInfo.fromMap(Map<String, Object?> m) => ChatInfo(
@@ -554,6 +586,9 @@ class ChatInfo {
     muted: asBool(m['muted']),
     pinned: asBool(m['pinned']),
     isBlocked: asBool(m['isBlocked']),
+    members: asList(
+      m['members'],
+    ).map((Object? item) => ChatMemberInfo.fromMap(asMap(item))).toList(),
   );
 
   final int chatId;
@@ -568,6 +603,7 @@ class ChatInfo {
   final bool muted;
   final bool pinned;
   final bool isBlocked;
+  final List<ChatMemberInfo> members;
 }
 
 class SessionInfo {

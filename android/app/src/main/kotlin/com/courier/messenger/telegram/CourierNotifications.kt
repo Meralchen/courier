@@ -9,6 +9,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import androidx.core.app.NotificationCompat
 import org.drinkless.tdlib.TdApi
 
 /**
@@ -39,7 +40,7 @@ internal class CourierNotifications(private val context: Context) {
             context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) ==
             PackageManager.PERMISSION_GRANTED
 
-    fun show(chatId: Long, title: String, text: String) {
+    fun show(chatId: Long, title: String, text: String, sound: Boolean = true) {
         if (!allowed()) return
         val launch = context.packageManager.getLaunchIntentForPackage(context.packageName)
             ?: return
@@ -51,11 +52,12 @@ internal class CourierNotifications(private val context: Context) {
             launch,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        val notification = Notification.Builder(context, CHANNEL_ID)
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(context.applicationInfo.icon)
             .setContentTitle(title)
             .setContentText(text)
-            .setStyle(Notification.BigTextStyle().bigText(text))
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setSilent(!sound)
             .setAutoCancel(true)
             .setContentIntent(pending)
             .build()
@@ -77,6 +79,7 @@ internal class CourierNotifications(private val context: Context) {
  * after a cold start) and muted chats are skipped so the phone is not flooded.
  */
 internal fun TelegramEngine.notifyMessage(message: TdApi.Message) {
+    if (!notificationsEnabled) return
     if (message.isOutgoing || message.chatId == openChatId) return
     val chat = chats[message.chatId] ?: return
     if (chat.notificationSettings.muteFor > 0) return
@@ -89,5 +92,5 @@ internal fun TelegramEngine.notifyMessage(message: TdApi.Message) {
         sender.isNotBlank() -> "$sender: $text"
         else -> text
     }
-    notifications?.show(message.chatId, chat.title, body)
+    notifications?.show(message.chatId, chat.title, body, notificationSounds)
 }

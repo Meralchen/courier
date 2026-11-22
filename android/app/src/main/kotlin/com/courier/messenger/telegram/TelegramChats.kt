@@ -36,6 +36,7 @@ internal fun TelegramEngine.openChat(chatId: Long) {
     openChatId = chatId
     notifications?.cancel(chatId)
     client?.fire(TdApi.OpenChat(chatId))
+    refreshPinned(chatId)
     val cached = messages[chatId]
     if (cached.isNullOrEmpty()) loadHistory(chatId, 0L, null)
     else publishConversation(chatId)
@@ -84,6 +85,64 @@ internal fun TelegramEngine.loadMore(chatId: Long, result: MethodChannel.Result)
         return
     }
     loadHistory(chatId, oldest, result)
+}
+
+/// TDLib has no pinned-message update in this version, so the bar is refreshed
+/// whenever a chat opens and after every pin or unpin.
+internal fun TelegramEngine.refreshPinned(chatId: Long) {
+    client?.send(TdApi.GetChatPinnedMessage(chatId)) { reply ->
+        if (reply is TdApi.Message) pinnedMessages[chatId] = reply
+        else pinnedMessages.remove(chatId)
+        main.post { publishConversationIfOpen(chatId) }
+    }
+}
+
+internal fun TelegramEngine.pinMessage(
+    chatId: Long,
+    messageId: Long,
+    pinned: Boolean,
+    result: MethodChannel.Result,
+) {
+    val c = client ?: run {
+        result.error("tdlib", "TDLib is not running", null)
+        return
+    }
+    fun finish(reply: TdApi.Object) {
+        main.post {
+            if (reply is TdApi.Error) {
+                emitError(reply.message)
+                result.error("tdlib", reply.message, null)
+            } else {
+                refreshPinned(chatId)
+                result.success(null)
+            }
+        }
+    }
+    if (pinned) {
+        c.send(TdApi.PinChatMessage(chatId, messageId, false, false)) { reply ->
+            finish(reply)
+        }
+    } else {
+        c.send(TdApi.UnpinChatMessage(chatId, messageId)) { reply -> finish(reply) }
+    }
+}
+
+/// Opens (or creates) the private chat with a group member.
+internal fun TelegramEngine.openUser(userId: Long, result: MethodChannel.Result) {
+    client?.send(TdApi.CreatePrivateChat(userId, true)) { reply ->
+        main.post {
+            if (reply is TdApi.Chat) {
+                chats[reply.id] = reply
+                publishChats()
+                result.success(reply.id)
+            } else if (reply is TdApi.Error) {
+                emitError(reply.message)
+                result.error("tdlib", reply.message, null)
+            } else {
+                result.error("tdlib", "Could not open the profile", null)
+            }
+        }
+    } ?: result.error("tdlib", "TDLib is not running", null)
 }
 
 internal fun TelegramEngine.markRead(chatId: Long) {

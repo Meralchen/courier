@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 
@@ -14,6 +15,8 @@ import '../components/ios_ui.dart';
 import '../components/photo_viewer.dart';
 import '../components/pressable.dart';
 import '../components/sheets.dart';
+import 'add_members_screen.dart';
+import 'chat_screen.dart';
 
 class ChatInfoScreen extends StatefulWidget {
   const ChatInfoScreen({super.key, required this.chatId});
@@ -35,13 +38,88 @@ class _ChatInfoScreenState extends State<ChatInfoScreen> {
     });
   }
 
+  Future<void> _openMember(int userId) async {
+    final int? chatId = await TelegramScope.read(context).openUser(userId);
+    if (!mounted || chatId == null) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (BuildContext _) => ChatScreen(chatId: chatId),
+      ),
+    );
+  }
+
+  Future<String?> _prompt({
+    required String title,
+    required String initial,
+    int maxLines = 1,
+  }) async {
+    final TextEditingController controller = TextEditingController(
+      text: initial,
+    );
+    final String? value = await showCupertinoDialog<String>(
+      context: context,
+      builder: (BuildContext dialogContext) => CupertinoAlertDialog(
+        title: Text(title),
+        content: Padding(
+          padding: const EdgeInsets.only(top: 10),
+          child: CupertinoTextField(
+            controller: controller,
+            autofocus: true,
+            minLines: 1,
+            maxLines: maxLines,
+            padding: const EdgeInsets.all(10),
+          ),
+        ),
+        actions: <Widget>[
+          CupertinoDialogAction(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancel'),
+          ),
+          CupertinoDialogAction(
+            onPressed: () => Navigator.of(dialogContext).pop(controller.text),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    return value;
+  }
+
+  Future<void> _addMembers() async {
+    final bool? added = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (BuildContext _) => AddMembersScreen(chatId: widget.chatId),
+      ),
+    );
+    if (added == true && mounted) {
+      await TelegramScope.read(context).loadChatInfo(widget.chatId);
+    }
+  }
+
+  Future<void> _leaveChat(ChatSummary chat) async {
+    final TelegramStore store = TelegramScope.read(context);
+    final bool confirmed = await showGlassConfirm(
+      context,
+      title: chat.isGroup ? 'Leave group?' : 'Leave channel?',
+      message: 'You will stop receiving messages from this chat.',
+      confirmLabel: 'Leave',
+      destructive: true,
+    );
+    if (!confirmed) return;
+    await store.leaveChat(widget.chatId);
+    if (mounted) {
+      Navigator.of(context).popUntil((Route<dynamic> route) => route.isFirst);
+    }
+  }
+
   Future<void> _copy(String value, String label) async {
     if (value.isEmpty) return;
     await Clipboard.setData(ClipboardData(text: value));
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$label copied')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('$label copied')));
   }
 
   @override
@@ -53,8 +131,13 @@ class _ChatInfoScreenState extends State<ChatInfoScreen> {
     if (chat == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-    final String title = info?.title.isNotEmpty == true ? info!.title : chat.title;
+    final String title = info?.title.isNotEmpty == true
+        ? info!.title
+        : chat.title;
     final String about = info?.about ?? '';
+    final List<ChatMemberInfo> members =
+        info?.members ?? const <ChatMemberInfo>[];
+    final int memberCount = info?.memberCount ?? chat.memberCount;
     final String phone = info?.phone ?? '';
     final String username = info?.username ?? '';
     final int photoFileId = info?.photoFileId ?? chat.photoFileId;
@@ -134,8 +217,10 @@ class _ChatInfoScreenState extends State<ChatInfoScreen> {
                         Text(
                           chat.isPrivate
                               ? (chat.online
-                                  ? 'online'
-                                  : lastSeenLabel(chat.lastSeen))
+                                    ? 'online'
+                                    : lastSeenLabel(chat.lastSeen))
+                              : memberCount > 0
+                              ? '$memberCount ${chat.isGroup ? 'members' : 'subscribers'}'
                               : (chat.isGroup ? 'group chat' : 'channel'),
                           textAlign: TextAlign.center,
                           style: AppText.subhead.copyWith(
@@ -144,7 +229,8 @@ class _ChatInfoScreenState extends State<ChatInfoScreen> {
                                 : colors.textSecondary,
                           ),
                         ),
-                        if (phone.isNotEmpty || username.isNotEmpty) ...<Widget>[
+                        if (phone.isNotEmpty ||
+                            username.isNotEmpty) ...<Widget>[
                           const SizedBox(height: 10),
                           Wrap(
                             spacing: 8,
@@ -189,13 +275,13 @@ class _ChatInfoScreenState extends State<ChatInfoScreen> {
                               ? Icons.notifications_active_outlined
                               : Icons.notifications_off_outlined,
                           label: chat.muted ? 'Unmute' : 'Mute',
-                          onTap: () => store.setMuted(
-                            widget.chatId,
-                            !chat.muted,
-                          ),
+                          onTap: () =>
+                              store.setMuted(widget.chatId, !chat.muted),
                         ),
                         _Action(
-                          icon: chat.pinned ? Icons.push_pin : Icons.push_pin_outlined,
+                          icon: chat.pinned
+                              ? Icons.push_pin
+                              : Icons.push_pin_outlined,
                           label: chat.pinned ? 'Unpin' : 'Pin',
                           onTap: () =>
                               store.setPinned(widget.chatId, !chat.pinned),
@@ -233,6 +319,66 @@ class _ChatInfoScreenState extends State<ChatInfoScreen> {
                       ),
                     ),
                   ),
+                if (members.isNotEmpty) ...<Widget>[
+                  const SliverToBoxAdapter(child: SectionLabel('Members')),
+                  SliverToBoxAdapter(
+                    child: SettingsGroup(
+                      children: <Widget>[
+                        for (final ChatMemberInfo member in members)
+                          Pressable(
+                            onTap: () => _openMember(member.userId),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 15,
+                                vertical: 8,
+                              ),
+                              child: Row(
+                                children: <Widget>[
+                                  Avatar(
+                                    title: member.title,
+                                    seed: member.userId,
+                                    size: 32,
+                                    photoFileId: member.photoFileId,
+                                    photoPath: member.photoPath,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: <Widget>[
+                                        Text(
+                                          member.title,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: AppText.body.copyWith(
+                                            fontSize: 16,
+                                            color: colors.textPrimary,
+                                          ),
+                                        ),
+                                        if (member.username.isNotEmpty)
+                                          Text(
+                                            '@${member.username}',
+                                            style: AppText.caption.copyWith(
+                                              color: colors.textSecondary,
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                  Icon(
+                                    Icons.chevron_right,
+                                    size: 18,
+                                    color: colors.textTertiary,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
                 const SliverToBoxAdapter(child: SectionLabel('Notifications')),
                 SliverToBoxAdapter(
                   child: SettingsGroup(
@@ -269,10 +415,10 @@ class _ChatInfoScreenState extends State<ChatInfoScreen> {
                           physics: const NeverScrollableScrollPhysics(),
                           gridDelegate:
                               const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 3,
-                            mainAxisSpacing: 4,
-                            crossAxisSpacing: 4,
-                          ),
+                                crossAxisCount: 3,
+                                mainAxisSpacing: 4,
+                                crossAxisSpacing: 4,
+                              ),
                           itemCount: media.length > 9 ? 9 : media.length,
                           itemBuilder: (BuildContext context, int index) {
                             final Message message = media[index];
@@ -297,14 +443,14 @@ class _ChatInfoScreenState extends State<ChatInfoScreen> {
                                     : Image.file(
                                         File(path),
                                         fit: BoxFit.cover,
-                                        errorBuilder: (
-                                          BuildContext _,
-                                          Object __,
-                                          StackTrace? ___,
-                                        ) =>
-                                            Container(
-                                          color: colors.cardElevated,
-                                        ),
+                                        errorBuilder:
+                                            (
+                                              BuildContext _,
+                                              Object __,
+                                              StackTrace? ___,
+                                            ) => Container(
+                                              color: colors.cardElevated,
+                                            ),
                                       ),
                               ),
                             );
@@ -318,6 +464,56 @@ class _ChatInfoScreenState extends State<ChatInfoScreen> {
                 SliverToBoxAdapter(
                   child: SettingsGroup(
                     children: <Widget>[
+                      if (!chat.isPrivate) ...<Widget>[
+                        if (chat.isGroup)
+                          SettingsRow(
+                            label: 'Add members',
+                            icon: Icons.person_add_alt_1_outlined,
+                            iconColor: colors.accent,
+                            chevron: true,
+                            onTap: _addMembers,
+                          ),
+                        SettingsRow(
+                          label: 'Edit name',
+                          icon: Icons.edit_outlined,
+                          iconColor: colors.accent,
+                          chevron: true,
+                          onTap: () async {
+                            final TelegramStore store = TelegramScope.read(
+                              context,
+                            );
+                            final String? name = await _prompt(
+                              title: 'Group name',
+                              initial: title,
+                            );
+                            if (name == null || name.trim().isEmpty) return;
+                            await store.setChatTitle(widget.chatId, name);
+                            await store.loadChatInfo(widget.chatId);
+                          },
+                        ),
+                        SettingsRow(
+                          label: 'Edit description',
+                          icon: Icons.notes_outlined,
+                          iconColor: colors.textSecondary,
+                          chevron: true,
+                          onTap: () async {
+                            final TelegramStore store = TelegramScope.read(
+                              context,
+                            );
+                            final String? description = await _prompt(
+                              title: 'Description',
+                              initial: about,
+                              maxLines: 3,
+                            );
+                            if (description == null) return;
+                            await store.setChatDescription(
+                              widget.chatId,
+                              description,
+                            );
+                            await store.loadChatInfo(widget.chatId);
+                          },
+                        ),
+                      ],
                       SettingsRow(
                         label: 'Clear history',
                         icon: Icons.cleaning_services_outlined,
@@ -357,6 +553,14 @@ class _ChatInfoScreenState extends State<ChatInfoScreen> {
                           }
                         },
                       ),
+                      if (!chat.isPrivate)
+                        SettingsRow(
+                          label: chat.isGroup ? 'Leave group' : 'Leave channel',
+                          icon: Icons.logout,
+                          iconColor: colors.danger,
+                          danger: true,
+                          onTap: () => _leaveChat(chat),
+                        ),
                     ],
                   ),
                 ),
@@ -370,9 +574,12 @@ class _ChatInfoScreenState extends State<ChatInfoScreen> {
   }
 }
 
-
 class _InfoPill extends StatelessWidget {
-  const _InfoPill({required this.icon, required this.text, required this.onTap});
+  const _InfoPill({
+    required this.icon,
+    required this.text,
+    required this.onTap,
+  });
 
   final IconData icon;
   final String text;
@@ -417,7 +624,12 @@ class _Action extends StatelessWidget {
     final AppColors colors = AppColors.of(context);
     return Column(
       children: <Widget>[
-        GlassCircleButton(icon: icon, size: 46, color: colors.accent, onTap: onTap),
+        GlassCircleButton(
+          icon: icon,
+          size: 46,
+          color: colors.accent,
+          onTap: onTap,
+        ),
         const SizedBox(height: 4),
         Text(
           label,

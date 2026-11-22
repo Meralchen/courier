@@ -2,6 +2,7 @@ package com.courier.messenger.telegram
 
 import io.flutter.plugin.common.MethodChannel
 import org.drinkless.tdlib.TdApi
+import java.util.concurrent.atomic.AtomicInteger
 
 internal fun TelegramEngine.updateProfile(
     firstName: String,
@@ -111,10 +112,10 @@ internal fun TelegramEngine.requestChatInfo(chatId: Long, result: MethodChannel.
     base["muted"] = chat.notificationSettings.muteFor > 0
     base["pinned"] = chat.positions.any { it.list is TdApi.ChatListMain && it.isPinned }
     base["isBlocked"] = false
+    base["members"] = emptyList<Any>()
 
     if (privateType == null) {
-        emit(mapOf("type" to "chatInfo", "info" to base))
-        result.success(null)
+        requestGroupInfo(chat, base, result)
         return
     }
 
@@ -142,6 +143,132 @@ internal fun TelegramEngine.requestChatInfo(chatId: Long, result: MethodChannel.
         }
     }
     result.success(null)
+}
+
+/// Groups and channels: description, subscriber/member count and a member
+/// list resolved into the same avatars the chat list uses.
+private fun TelegramEngine.requestGroupInfo(
+    chat: TdApi.Chat,
+    base: HashMap<String, Any?>,
+    result: MethodChannel.Result,
+) {
+    val c = client ?: run {
+        result.error("tdlib", "TDLib is not running", null)
+        return
+    }
+    when (val type = chat.type) {
+        is TdApi.ChatTypeSupergroup -> {
+            c.send(TdApi.GetSupergroupFullInfo(type.supergroupId)) { full ->
+                val info = HashMap(base)
+                var total = 0
+                if (full is TdApi.SupergroupFullInfo) {
+                    info["about"] = full.description
+                    total = full.memberCount
+                }
+                c.send(
+                    TdApi.GetSupergroupMembers(
+                        type.supergroupId,
+                        TdApi.SupergroupMembersFilterRecent(),
+                        0,
+                        50,
+                    ),
+                ) { members ->
+                    if (members is TdApi.ChatMembers) {
+                        if (members.totalCount > 0) total = members.totalCount
+                        info["memberCount"] = total
+                        resolveMembers(memberIds(members.members), info, result)
+                    } else {
+                        info["memberCount"] = total
+                        resolveMembers(emptyList(), info, result)
+                    }
+                }
+            }
+        }
+        is TdApi.ChatTypeBasicGroup -> {
+            c.send(TdApi.GetBasicGroupFullInfo(type.basicGroupId)) { full ->
+                val info = HashMap(base)
+                val basic = full as? TdApi.BasicGroupFullInfo
+                val members = basic?.members ?: emptyArray()
+                info["about"] = basic?.description ?: ""
+                info["memberCount"] = members.size
+                resolveMembers(memberIds(members), info, result)
+            }
+        }
+        else -> {
+            emit(mapOf("type" to "chatInfo", "info" to base))
+            result.success(null)
+        }
+    }
+}
+
+private fun memberIds(members: Array<TdApi.ChatMember>): List<Long> =
+    members
+        .mapNotNull { (it.memberId as? TdApi.MessageSenderUser)?.userId }
+        .distinct()
+        .take(50)
+
+private fun TelegramEngine.resolveMembers(
+    ids: List<Long>,
+    info: HashMap<String, Any?>,
+    result: MethodChannel.Result,
+) {
+    if (ids.isEmpty()) {
+        finishMembers(ids, emptyMap(), info, result)
+        return
+    }
+    val resolved = java.util.concurrent.ConcurrentHashMap<Long, TdApi.User>()
+    val pending = AtomicInteger(ids.size)
+    ids.forEach { id ->
+        val cached = users[id]
+        if (cached != null) {
+            resolved[id] = cached
+            if (pending.decrementAndGet() == 0) {
+                finishMembers(ids, resolved, info, result)
+            }
+        } else {
+            client?.send(TdApi.GetUser(id)) { reply ->
+                if (reply is TdApi.User) {
+                    users[id] = reply
+                    resolved[id] = reply
+                }
+                if (pending.decrementAndGet() == 0) {
+                    finishMembers(ids, resolved, info, result)
+                }
+            } ?: run {
+                if (pending.decrementAndGet() == 0) {
+                    finishMembers(ids, resolved, info, result)
+                }
+            }
+        }
+    }
+}
+
+private fun TelegramEngine.finishMembers(
+    ids: List<Long>,
+    resolved: Map<Long, TdApi.User>,
+    info: HashMap<String, Any?>,
+    result: MethodChannel.Result,
+) {
+    val list = ids.mapNotNull { id ->
+        val user = resolved[id] ?: return@mapNotNull null
+        val photo = user.profilePhoto?.small
+        ensureDownload(photo)
+        mapOf(
+            "userId" to user.id,
+            "title" to TdFormat.name(user.firstName, user.lastName)
+                .ifBlank { "Member" },
+            "username" to (user.usernames?.activeUsernames?.firstOrNull() ?: ""),
+            "photoFileId" to (photo?.id ?: 0),
+            "photoPath" to TdFormat.localPath(photo),
+            "online" to (user.status is TdApi.UserStatusOnline),
+            "lastSeen" to ((user.status as? TdApi.UserStatusOffline)?.wasOnline ?: 0),
+        )
+    }
+    info["members"] = list
+    main.post {
+        emit(mapOf("type" to "chatInfo", "info" to info))
+        result.success(null)
+    }
 }
 
 internal fun TelegramEngine.requestSessions(result: MethodChannel.Result) {
