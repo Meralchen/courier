@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../core/theme.dart';
 import '../../state/scopes.dart';
@@ -6,7 +6,6 @@ import '../../telegram/models.dart';
 import '../../telegram/telegram_store.dart';
 import '../components/avatar.dart';
 import '../components/glass.dart';
-import '../components/ios_ui.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});

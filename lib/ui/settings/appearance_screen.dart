@@ -1,10 +1,9 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../core/theme.dart';
 import '../../state/app_settings.dart';
 import '../../state/scopes.dart';
 import '../components/glass.dart';
-import '../components/ios_ui.dart';
 import '../components/pressable.dart';
 
 class AppearanceScreen extends StatelessWidget {

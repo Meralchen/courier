@@ -1,7 +1,7 @@
 import 'dart:async';
 
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../core/format.dart';
@@ -264,7 +264,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           isFirst: !samePrevious,
           isLast: !sameNext,
           showSender: !message.outgoing &&
-              (!samePrevious || previous?.sender != message.sender),
+              (!samePrevious || previous.sender != message.sender),
           onLongPress: () => _actions(message),
           onPhotoTap: () => openPhoto(
             context,
